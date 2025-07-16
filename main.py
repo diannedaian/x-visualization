@@ -27,7 +27,7 @@ dataVariable = 0
 
 running = True
 
-while running: 
+while running:
     serialCom.reset_input_buffer()  # Clear the input buffer
     s_bytes = serialCom.readline()
     decoded_bytes = s_bytes.decode("utf-8").strip('\r\n')
@@ -36,7 +36,6 @@ while running:
     topLeftData = []
     topRightData = []
     farRightData = []
-    
+
     data = decoded_bytes.split(",")
     print(f"data: {data}")
-    

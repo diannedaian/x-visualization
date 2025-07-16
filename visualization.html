@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arduino Data Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Arduino Data Visualization</h1>
+        </div>
+
+        <div class="status">
+            <div id="connection-status">Connecting...</div>
+            <div class="controls">
+                <button id="clear-btn">Clear Data</button>
+                <button id="pause-btn">Pause</button>
+                <button id="export-btn">Export Data</button>
+            </div>
+        </div>
+
+        <div id="graph-container"></div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff6b6b;"></div>
+                <span>Far Left</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4ecdc4;"></div>
+                <span>Top Left</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #45b7d1;"></div>
+                <span>Top Right</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f9ca24;"></div>
+                <span>Far Right</span>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="far-left-value">0</div>
+                <div class="stat-label">Far Left (Latest)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="top-left-value">0</div>
+                <div class="stat-label">Top Left (Latest)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="top-right-value">0</div>
+                <div class="stat-label">Top Right (Latest)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="far-right-value">0</div>
+                <div class="stat-label">Far Right (Latest)</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let socket;
+        let dataPoints = [];
+        let isPaused = false;
+        let maxDataPoints = 100;
+        let graphWidth, graphHeight;
+        let graphX, graphY;
+        let minY = 0, maxY = 1024; // Arduino analog range
+        let autoScale = true;
+
+        // Colors for each data stream
+        const colors = {
+            farLeft: [255, 107, 107],    // Red
+            topLeft: [78, 205, 196],     // Teal
+            topRight: [69, 183, 209],    // Blue
+            farRight: [249, 202, 36]     // Yellow
+        };
+
+        function setup() {
+            // Create canvas and attach to container
+            graphWidth = 1000;
+            graphHeight = 400;
+            let canvas = createCanvas(graphWidth, graphHeight);
+            canvas.parent('graph-container');
+
+            // Graph positioning
+            graphX = 60;
+            graphY = 40;
+            graphWidth = width - 80;
+            graphHeight = height - 80;
+
+            // Initialize WebSocket connection
+            initializeWebSocket();
+
+            // Setup UI event listeners
+            setupEventListeners();
+        }
+
+        function initializeWebSocket() {
+            socket = io('http://localhost:5000');
+
+            socket.on('connect', function() {
+                updateStatus('Connected', '#4CAF50');
+                console.log('Connected to server');
+            });
+
+            socket.on('disconnect', function() {
+                updateStatus('Disconnected', '#f44336');
+                console.log('Disconnected from server');
+            });
+
+            socket.on('arduino_data', function(data) {
+                if (!isPaused) {
+                    handleNewData(data);
+                }
+            });
+
+            socket.on('server_status', function(data) {
+                console.log('Server status:', data.message);
+            });
+        }
+
+        function handleNewData(data) {
+            // Add timestamp for x-axis
+            data.displayTime = millis();
+
+            // Add to data array
+            dataPoints.push(data);
+
+            // Keep only recent data points
+            if (dataPoints.length > maxDataPoints) {
+                dataPoints.shift();
+            }
+
+            // Update auto-scaling
+            if (autoScale) {
+                updateScale();
+            }
+
+            // Update real-time stats
+            updateStats(data);
+        }
+
+        function updateScale() {
+            if (dataPoints.length === 0) return;
+
+            let tempMinY = Infinity;
+            let tempMaxY = -Infinity;
+
+            dataPoints.forEach(point => {
+                tempMinY = Math.min(tempMinY, point.far_left, point.top_left, point.top_right, point.far_right);
+                tempMaxY = Math.max(tempMaxY, point.far_left, point.top_left, point.top_right, point.far_right);
+            });
+
+            // Add some padding
+            let padding = (tempMaxY - tempMinY) * 0.1;
+            minY = tempMinY - padding;
+            maxY = tempMaxY + padding;
+
+            // Ensure minimum range
+            if (maxY - minY < 10) {
+                let center = (maxY + minY) / 2;
+                minY = center - 5;
+                maxY = center + 5;
+            }
+        }
+
+        function updateStats(data) {
+            document.getElementById('far-left-value').textContent = data.far_left.toFixed(1);
+            document.getElementById('top-left-value').textContent = data.top_left.toFixed(1);
+            document.getElementById('top-right-value').textContent = data.top_right.toFixed(1);
+            document.getElementById('far-right-value').textContent = data.far_right.toFixed(1);
+        }
+
+        function updateStatus(message, color) {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.textContent = message;
+            statusEl.style.color = color;
+        }
+
+        function draw() {
+            background(26, 26, 26);
+
+            if (dataPoints.length === 0) {
+                drawEmptyState();
+                return;
+            }
+
+            // Draw graph background
+            drawGraphBackground();
+
+            // Draw grid
+            drawGrid();
+
+            // Draw data lines
+            drawDataLines();
+
+            // Draw axes
+            drawAxes();
+
+            // Draw current values indicator
+            drawCurrentValues();
+        }
+
+        function drawEmptyState() {
+            fill(150);
+            textAlign(CENTER, CENTER);
+            textSize(16);
+            text('Waiting for Arduino data...', width/2, height/2);
+        }
+
+        function drawGraphBackground() {
+            fill(40, 40, 40);
+            rect(graphX, graphY, graphWidth, graphHeight);
+        }
+
+        function drawGrid() {
+            stroke(60, 60, 60);
+            strokeWeight(1);
+
+            // Horizontal grid lines
+            for (let i = 0; i <= 10; i++) {
+                let y = graphY + (i * graphHeight / 10);
+                line(graphX, y, graphX + graphWidth, y);
+            }
+
+            // Vertical grid lines
+            for (let i = 0; i <= 10; i++) {
+                let x = graphX + (i * graphWidth / 10);
+                line(x, graphY, x, graphY + graphHeight);
+            }
+        }
+
+        function drawDataLines() {
+            if (dataPoints.length < 2) return;
+
+            strokeWeight(2);
+            noFill();
+
+            // Draw each data stream
+            drawLine('far_left', colors.farLeft);
+            drawLine('top_left', colors.topLeft);
+            drawLine('top_right', colors.topRight);
+            drawLine('far_right', colors.farRight);
+        }
+
+        function drawLine(property, color) {
+            stroke(color[0], color[1], color[2]);
+            beginShape();
+
+            for (let i = 0; i < dataPoints.length; i++) {
+                let x = map(i, 0, maxDataPoints - 1, graphX, graphX + graphWidth);
+                let y = map(dataPoints[i][property], minY, maxY, graphY + graphHeight, graphY);
+                vertex(x, y);
+            }
+
+            endShape();
+        }
+
+        function drawAxes() {
+            stroke(200);
+            strokeWeight(2);
+
+            // Y-axis
+            line(graphX, graphY, graphX, graphY + graphHeight);
+
+            // X-axis
+            line(graphX, graphY + graphHeight, graphX + graphWidth, graphY + graphHeight);
+
+            // Y-axis labels
+            fill(200);
+            textAlign(RIGHT, CENTER);
+            textSize(12);
+
+            for (let i = 0; i <= 5; i++) {
+                let y = graphY + (i * graphHeight / 5);
+                let value = map(i, 0, 5, maxY, minY);
+                text(value.toFixed(0), graphX - 10, y);
+            }
+
+            // X-axis label
+            textAlign(CENTER, TOP);
+            text('Time →', graphX + graphWidth/2, graphY + graphHeight + 20);
+
+            // Y-axis label
+            textAlign(CENTER, CENTER);
+            push();
+            translate(20, graphY + graphHeight/2);
+            rotate(-PI/2);
+            text('Sensor Value', 0, 0);
+            pop();
+        }
+
+        function drawCurrentValues() {
+            if (dataPoints.length === 0) return;
+
+            let latest = dataPoints[dataPoints.length - 1];
+            let x = graphX + graphWidth - 5;
+
+            // Draw current value dots
+            strokeWeight(1);
+            stroke(255);
+
+            let values = [
+                {val: latest.far_left, color: colors.farLeft},
+                {val: latest.top_left, color: colors.topLeft},
+                {val: latest.top_right, color: colors.topRight},
+                {val: latest.far_right, color: colors.farRight}
+            ];
+
+            values.forEach(item => {
+                let y = map(item.val, minY, maxY, graphY + graphHeight, graphY);
+                fill(item.color[0], item.color[1], item.color[2]);
+                ellipse(x, y, 6, 6);
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('clear-btn').addEventListener('click', function() {
+                dataPoints = [];
+            });
+
+            document.getElementById('pause-btn').addEventListener('click', function() {
+                isPaused = !isPaused;
+                this.textContent = isPaused ? 'Resume' : 'Pause';
+                this.style.backgroundColor = isPaused ? '#ff9800' : '#4CAF50';
+            });
+
+            document.getElementById('export-btn').addEventListener('click', function() {
+                exportData();
+            });
+        }
+
+        function exportData() {
+            if (dataPoints.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            let csv = 'timestamp,far_left,top_left,top_right,far_right\n';
+            dataPoints.forEach(point => {
+                csv += `${point.timestamp},${point.far_left},${point.top_left},${point.top_right},${point.far_right}\n`;
+            });
+
+            let blob = new Blob([csv], { type: 'text/csv' });
+            let url = window.URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = 'arduino_data.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Keyboard shortcuts
+        function keyPressed() {
+            if (key === 'c' || key === 'C') {
+                dataPoints = [];
+            }
+            if (key === 'p' || key === 'P') {
+                isPaused = !isPaused;
+                document.getElementById('pause-btn').click();
+            }
+            if (key === 's' || key === 'S') {
+                autoScale = !autoScale;
+                if (!autoScale) {
+                    minY = 0;
+                    maxY = 1024;
+                }
+            }
+        }
+
+        // Handle window resize
+        function windowResized() {
+            // Update graph dimensions if needed
+            graphWidth = width - 80;
+            graphHeight = height - 80;
+        }
+    </script>
+</body>
+</html>
