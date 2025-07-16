@@ -25,7 +25,8 @@ class ArduinoDataReader:
         self.csv_file = None
         self.csv_writer = None
         self.data_count = 0
-        self.max_data_points = 150
+        self.max_data_points = 100  # Keep only last 100 points in memory
+        self.data_buffer = []  # Buffer to store recent data points
 
     def setup_serial(self):
         """Initialize serial connection"""
@@ -35,6 +36,18 @@ class ArduinoDataReader:
             logger.info("Available ports:")
             for port in ports:
                 logger.info(f"  {port.device} - {port.name}")
+
+            # Try to find Arduino port automatically
+            arduino_ports = []
+            for port in ports:
+                if 'arduino' in port.name.lower() or 'usb' in port.name.lower():
+                    arduino_ports.append(port.device)
+            
+            if arduino_ports:
+                self.port = arduino_ports[0]
+                logger.info(f"Auto-detected Arduino port: {self.port}")
+            else:
+                logger.warning(f"No Arduino port detected, using default: {self.port}")
 
             # Open serial connection
             self.serial_com = serial.Serial(self.port, self.baud_rate)
@@ -77,17 +90,25 @@ class ArduinoDataReader:
             # Pad with zeros if not enough data
             while len(data) < 8:
                 data.append('0')
+            
+            # Convert to float, defaulting to 0 if conversion fails
+            def safe_float(value):
+                try:
+                    return float(value.strip()) if value.strip() else 0
+                except:
+                    return 0
+            
             parsed_data = {
                 'timestamp': time.time(),
                 'raw': raw_data,
-                'left_1': float(data[0]) if data[0].strip() else 0,
-                'left_2': float(data[1]) if data[1].strip() else 0,
-                'left_3': float(data[2]) if data[2].strip() else 0,
-                'left_4': float(data[3]) if data[3].strip() else 0,
-                'right_1': float(data[4]) if data[4].strip() else 0,
-                'right_2': float(data[5]) if data[5].strip() else 0,
-                'right_3': float(data[6]) if data[6].strip() else 0,
-                'right_4': float(data[7]) if data[7].strip() else 0,
+                'left_1': safe_float(data[0]),
+                'left_2': safe_float(data[1]),
+                'left_3': safe_float(data[2]),
+                'left_4': safe_float(data[3]),
+                'right_1': safe_float(data[4]),
+                'right_2': safe_float(data[5]),
+                'right_3': safe_float(data[6]),
+                'right_4': safe_float(data[7]),
                 'data_count': self.data_count
             }
             return parsed_data
@@ -129,6 +150,11 @@ class ArduinoDataReader:
                                 self.csv_writer.writerow(row)
                                 self.csv_file.flush()
 
+                            # Add to data buffer (keep only recent points)
+                            self.data_buffer.append(parsed_data)
+                            if len(self.data_buffer) > self.max_data_points:
+                                self.data_buffer.pop(0)  # Remove oldest data point
+
                             # Emit to WebSocket clients
                             socketio.emit('arduino_data', parsed_data)
 
@@ -136,11 +162,6 @@ class ArduinoDataReader:
                             logger.info(f"Data #{self.data_count}: {parsed_data}")
 
                             self.data_count += 1
-
-                            # Stop if max data points reached
-                            if self.data_count >= self.max_data_points:
-                                logger.info("Max data points reached, stopping...")
-                                self.running = False
 
                 time.sleep(0.1)  # Small delay to prevent overwhelming the system
 
@@ -258,7 +279,7 @@ if __name__ == '__main__':
         data_reader.start()
 
         # Start the Flask-SocketIO server
-        socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+        socketio.run(app, debug=True, host='0.0.0.0', port=5001)
 
     except KeyboardInterrupt:
         logger.info("Shutting down...")

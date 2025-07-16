@@ -184,7 +184,7 @@
       }
 
       function initializeWebSocket() {
-        socket = io("http://localhost:5000");
+        socket = io("http://localhost:5001");
 
         socket.on("connect", function () {
           updateStatus("Connected", "#4CAF50");
