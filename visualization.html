@@ -172,11 +172,12 @@
         let plotWidth = 280;
         let plotHeight = 180;
         let paddingX = 40;
-        let paddingY = 40;
+        let paddingY = 60;
         let cols = 4;
         let rows = 2;
+        let titleHeight = 50; // Extra space for row titles
         let canvasWidth = cols * plotWidth + (cols + 1) * paddingX;
-        let canvasHeight = rows * plotHeight + (rows + 1) * paddingY;
+        let canvasHeight = rows * plotHeight + (rows + 1) * paddingY + titleHeight;
         let canvas = createCanvas(canvasWidth, canvasHeight);
         canvas.parent("graph-container");
         initializeWebSocket();
@@ -184,7 +185,7 @@
       }
 
       function initializeWebSocket() {
-        socket = io("http://localhost:5001");
+        socket = io("http://localhost:5002");
 
         socket.on("connect", function () {
           updateStatus("Connected", "#4CAF50");
@@ -302,9 +303,20 @@
         let plotWidth = 280;
         let plotHeight = 180;
         let paddingX = 40;
-        let paddingY = 40;
+        let paddingY = 60;
         let cols = 4;
         let rows = 2;
+        
+        // Draw row titles
+        fill(255);
+        noStroke();
+        textAlign(CENTER, TOP);
+        textSize(18);
+        textStyle(BOLD);
+        text("Left Sensors", paddingX + (plotWidth + paddingX) * 2, paddingY - 30);
+        text("Right Sensors", paddingX + (plotWidth + paddingX) * 2, paddingY + plotHeight + paddingY - 30);
+        textStyle(NORMAL);
+        
         for (let i = 0; i < 8; i++) {
           let col = i % cols;
           let row = Math.floor(i / cols);
@@ -339,8 +351,8 @@
         noStroke();
         textAlign(RIGHT, CENTER);
         textSize(10);
-        text("5000", x + 35, y + 10);
-        text("2500", x + 35, y + (h - 30) / 2 + y / 2);
+        text("5000", x + 35, y + 20);
+        text("2500", x + 35, y + (h - 20) / 2);
         text("0", x + 35, y + h - 30);
         // X axis label
         textAlign(CENTER, TOP);
