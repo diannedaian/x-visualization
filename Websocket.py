@@ -59,8 +59,8 @@ class ArduinoDataReader:
             self.csv_file.truncate()
             self.csv_writer = csv.writer(self.csv_file)
 
-            # Write header
-            header = ['timestamp', 'data_point', 'far_left', 'top_left', 'top_right', 'far_right']
+            # Write header for 8 ports
+            header = ['timestamp', 'data_point', 'left_1', 'left_2', 'left_3', 'left_4', 'right_1', 'right_2', 'right_3', 'right_4']
             self.csv_writer.writerow(header)
 
             logger.info(f"CSV file '{filename}' initialized")
@@ -71,23 +71,26 @@ class ArduinoDataReader:
             return False
 
     def parse_arduino_data(self, raw_data):
-        """Parse the Arduino data string"""
+        """Parse the Arduino data string for 8 ports"""
         try:
             data = raw_data.split(",")
-
-            # Extract the four data points (adjust based on your Arduino output format)
+            # Pad with zeros if not enough data
+            while len(data) < 8:
+                data.append('0')
             parsed_data = {
                 'timestamp': time.time(),
                 'raw': raw_data,
-                'far_left': float(data[0]) if len(data) > 0 and data[0].strip() else 0,
-                'top_left': float(data[1]) if len(data) > 1 and data[1].strip() else 0,
-                'top_right': float(data[2]) if len(data) > 2 and data[2].strip() else 0,
-                'far_right': float(data[3]) if len(data) > 3 and data[3].strip() else 0,
+                'left_1': float(data[0]) if data[0].strip() else 0,
+                'left_2': float(data[1]) if data[1].strip() else 0,
+                'left_3': float(data[2]) if data[2].strip() else 0,
+                'left_4': float(data[3]) if data[3].strip() else 0,
+                'right_1': float(data[4]) if data[4].strip() else 0,
+                'right_2': float(data[5]) if data[5].strip() else 0,
+                'right_3': float(data[6]) if data[6].strip() else 0,
+                'right_4': float(data[7]) if data[7].strip() else 0,
                 'data_count': self.data_count
             }
-
             return parsed_data
-
         except Exception as e:
             logger.error(f"Failed to parse data '{raw_data}': {e}")
             return None
@@ -114,10 +117,14 @@ class ArduinoDataReader:
                                 row = [
                                     parsed_data['timestamp'],
                                     self.data_count,
-                                    parsed_data['far_left'],
-                                    parsed_data['top_left'],
-                                    parsed_data['top_right'],
-                                    parsed_data['far_right']
+                                    parsed_data['left_1'],
+                                    parsed_data['left_2'],
+                                    parsed_data['left_3'],
+                                    parsed_data['left_4'],
+                                    parsed_data['right_1'],
+                                    parsed_data['right_2'],
+                                    parsed_data['right_3'],
+                                    parsed_data['right_4']
                                 ]
                                 self.csv_writer.writerow(row)
                                 self.csv_file.flush()

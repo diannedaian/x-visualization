@@ -32,10 +32,14 @@ while running:
     s_bytes = serialCom.readline()
     decoded_bytes = s_bytes.decode("utf-8").strip('\r\n')
     #print(f"decoded bytes: {decoded_bytes}")
-    farLeftData = []
-    topLeftData = []
-    topRightData = []
-    farRightData = []
+    left_1 = []
+    left_2 = []
+    left_3 = []
+    left_4 = []
+    right_1 = []
+    right_2 = []
+    right_3 = []
+    right_4 = []
 
     data = decoded_bytes.split(",")
     print(f"data: {data}")
