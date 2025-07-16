@@ -128,7 +128,7 @@
       let socket;
       let dataPoints = [];
       let isPaused = false;
-      let maxDataPoints = 100;
+      let maxDataPoints = 50;
       let graphWidth, graphHeight;
       let graphX, graphY;
       let minY = 0,
@@ -227,6 +227,12 @@
 
         // Update real-time stats
         updateStats(data);
+
+        // Calculate EMA for the new data point
+        data.ema = {};
+        for (let key of portKeys) {
+            data.ema[key] = calculateEMA(key, dataPoints.concat([data]), dataPoints.length);
+        }
       }
 
       function updateScale() {
@@ -358,7 +364,8 @@
         textAlign(CENTER, TOP);
         textSize(10);
         text("Time", x + w / 2, y + h - 18);
-        // Draw data line
+        // Draw original data line (commented out to show only smoothed line)
+        /*
         let n = dataPoints.length;
         if (n > 1) {
           stroke(color[0], color[1], color[2]);
@@ -372,7 +379,9 @@
           }
           endShape();
         }
+        */
         // Draw current value dot
+        let n = dataPoints.length;
         if (n > 0) {
           let latest = dataPoints[n - 1][key];
           let px = x + w - 15;
@@ -393,7 +402,47 @@
         textAlign(LEFT, TOP);
         textSize(14);
         text(label, x + 45, y + 12);
+
+        // Draw smooth data line
+        if (dataPoints.length > 1) {
+            // Plot the smoothed data using stored values
+            stroke(color[0], color[1], color[2]);
+            strokeWeight(2);
+            noFill();
+            beginShape();
+            for (let i = 0, n = dataPoints.length; i < n; i++) {
+                let smoothedValue;
+                if (dataPoints[i].ema && dataPoints[i].ema[key] !== undefined) {
+                    smoothedValue = dataPoints[i].ema[key];
+                } else {
+                    // Fallback to raw value if EMA doesn't exist
+                    smoothedValue = dataPoints[i][key];
+                }
+                
+                if (smoothedValue < 0) {
+                    smoothedValue = 0;
+                } else if (smoothedValue > 5000) {
+                    smoothedValue = 5000;
+                }
+                
+                let px = map(i, 0, maxDataPoints - 1, x + 40, x + w - 10);
+                let py = map(smoothedValue, 0, 5000, y + h - 30, y + 10);
+                vertex(px, py);
+            }
+            endShape();
+        }
       }
+
+    // Exponential Moving Average - more stable than simple moving average
+    // a higher alpha value means more weight to the current value ! 
+    function calculateEMA(key, data, index, alpha = 0.7) {
+        if (index === 0) {
+            return data[0][key]; // if no previous value, return the first value
+        }
+        let currentValue = data[index][key];
+        let previousEMA = data[index - 1].ema ? data[index - 1].ema[key] : data[index - 1][key]; // previous EMA value or previous raw value if no EMA value
+        return alpha * currentValue + (1 - alpha) * previousEMA; // averages prevEMA & currentEMA, weighting the current value more heavily (alpha > 0.5)
+    }
 
       function setupEventListeners() {
         document

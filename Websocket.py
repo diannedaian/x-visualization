@@ -25,7 +25,7 @@ class ArduinoDataReader:
         self.csv_file = None
         self.csv_writer = None
         self.data_count = 0
-        self.max_data_points = 100  # Keep only last 100 points in memory
+        self.max_data_points = 50  # Keep only last 100 points in memory
         self.data_buffer = []  # Buffer to store recent data points
 
     def setup_serial(self):
