@@ -132,7 +132,7 @@
       let graphWidth, graphHeight;
       let graphX, graphY;
       let minY = 0,
-        maxY = 1024; // Arduino analog range
+      maxY = 1024; // Arduino analog range
       let autoScale = true;
 
       // Colors for each data stream
@@ -174,7 +174,7 @@
         let paddingX = 40;
         let paddingY = 60;
         let cols = 4;
-        let rows = 2;
+        let rows = 4;
         let titleHeight = 50; // Extra space for row titles
         let canvasWidth = cols * plotWidth + (cols + 1) * paddingX;
         let canvasHeight = rows * plotHeight + (rows + 1) * paddingY + titleHeight;
@@ -311,7 +311,7 @@
         let paddingX = 40;
         let paddingY = 60;
         let cols = 4;
-        let rows = 2;
+        let rows = 4;
         
         // Draw row titles
         fill(255);
@@ -319,15 +319,17 @@
         textAlign(CENTER, TOP);
         textSize(18);
         textStyle(BOLD);
-        text("Left Sensors", paddingX + (plotWidth + paddingX) * 2, paddingY - 30);
-        text("Right Sensors", paddingX + (plotWidth + paddingX) * 2, paddingY + plotHeight + paddingY - 30);
+        text("Left Sensors", (plotWidth + paddingX) * 2, paddingY - 30);
+        text("All Left Sensors", (plotWidth + paddingX) * 2, paddingY + plotHeight + paddingY - 30);
+        text("Right Sensors", (plotWidth + paddingX) * 2, paddingY + 2 * (plotHeight + paddingY) - 30);
+        text("All Right Sensors",(plotWidth + paddingX) * 2, paddingY + 3 * (plotHeight + paddingY) - 30);
         textStyle(NORMAL);
         
-        for (let i = 0; i < 8; i++) {
-          let col = i % cols;
-          let row = Math.floor(i / cols);
-          let x0 = paddingX + col * (plotWidth + paddingX);
-          let y0 = paddingY + row * (plotHeight + paddingY);
+        // Row 1: Individual left sensors
+        for (let i = 0; i < 4; i++) {
+          let col = i % 4;
+          let x0 = col * (plotWidth + paddingX);
+          let y0 = paddingY;
           drawMiniPlot(
             x0,
             y0,
@@ -337,6 +339,149 @@
             portLabels[i],
             colors[portKeys[i]]
           );
+        }
+
+        // Row 2: Combined left sensors
+        drawCombinedPlot(0, paddingY + plotHeight + paddingY, 4 * plotWidth + 3 * paddingX, plotHeight, "left", "All Left Sensors");
+        
+        // Row 3: Individual right sensors
+        for (let i = 4; i < 8; i++) {
+          let col = (i - 4) % 4;
+          let x0 = col * (plotWidth + paddingX);
+          let y0 = paddingY + 2 * (plotHeight + paddingY);
+          drawMiniPlot(
+            x0,
+            y0,
+            plotWidth,
+            plotHeight,
+            portKeys[i],
+            portLabels[i],
+            colors[portKeys[i]]
+          );
+        }
+        
+        // Row 4: Combined right sensors
+        drawCombinedPlot(0, paddingY + 3 * (plotHeight + paddingY), 4 * plotWidth + 3 * paddingX, plotHeight, "right", "All Right Sensors");
+      }
+
+      function drawCombinedPlot(x, y, w, h, sensorGroup, label) {
+        // Draw background
+        fill(40, 40, 40);
+        stroke(80);
+        rect(x, y, w, h, 8);
+        
+        // Draw axes
+        stroke(200);
+        strokeWeight(1);
+        // Y axis
+        line(x + 40, y + 10, x + 40, y + h - 30);
+        // X axis
+        line(x + 40, y + h - 30, x + w - 10, y + h - 30);
+        
+        // Y axis labels (0, 2500, 5000)
+        fill(200);
+        noStroke();
+        textAlign(RIGHT, CENTER);
+        textSize(10);
+        text("5000", x + 35, y + 20);
+        text("2500", x + 35, y + (h - 20) / 2);
+        text("0", x + 35, y + h - 30);
+        
+        // X axis label
+        textAlign(CENTER, TOP);
+        textSize(10);
+        text("Time", x + w / 2, y + h - 18);
+        
+        // Draw label
+        noStroke();
+        fill(255);
+        textAlign(LEFT, TOP);
+        textSize(14);
+        text(label, x + 45, y + 12);
+        
+        // Determine which sensors to plot based on sensorGroup
+        let sensorsToPlot = [];
+        if (sensorGroup === "left") {
+          sensorsToPlot = ["left_1", "left_2", "left_3", "left_4"];
+        } else if (sensorGroup === "right") {
+          sensorsToPlot = ["right_1", "right_2", "right_3", "right_4"];
+        }
+        
+        // Draw data lines for each sensor
+        if (dataPoints.length > 1) {
+          for (let sensorKey of sensorsToPlot) {
+            let color = colors[sensorKey];
+            
+            // Plot the smoothed data
+            stroke(color[0], color[1], color[2]);
+            strokeWeight(2);
+            noFill();
+            beginShape();
+            for (let i = 0, n = dataPoints.length; i < n; i++) {
+              let smoothedValue;
+              if (dataPoints[i].ema && dataPoints[i].ema[sensorKey] !== undefined) {
+                smoothedValue = dataPoints[i].ema[sensorKey];
+              } else {
+                // Fallback to raw value if EMA doesn't exist
+                smoothedValue = dataPoints[i][sensorKey];
+              }
+              
+              if (smoothedValue < 0) {
+                smoothedValue = 0;
+              } else if (smoothedValue > 5000) {
+                smoothedValue = 5000;
+              }
+              
+              let px = map(i, 0, maxDataPoints - 1, x + 40, x + w - 10);
+              let py = map(smoothedValue, 0, 5000, y + h - 30, y + 10);
+              vertex(px, py);
+            }
+            endShape();
+          }
+        }
+        
+        // Draw current value dots for each sensor
+        let n = dataPoints.length;
+        if (n > 0) {
+          for (let i = 0; i < sensorsToPlot.length; i++) {
+            let sensorKey = sensorsToPlot[i];
+            let color = colors[sensorKey];
+            let latest = Math.max(0, Math.min(5000, dataPoints[n - 1][sensorKey]));
+            let px = x + w - 15 - (i * 20); // Offset dots horizontally
+            let py = map(latest, 0, 5000, y + h - 30, y + 10);
+            
+            fill(color[0], color[1], color[2]);
+            stroke(255);
+            ellipse(px, py, 8, 8);
+            
+            // Show latest value
+            noStroke();
+            fill(230);
+            textAlign(LEFT, TOP);
+            textSize(10);
+            text(latest.toFixed(1), px + 10, py - 5);
+          }
+        }
+        
+        // Draw legend
+        let legendY = y + h - 15;
+        for (let i = 0; i < sensorsToPlot.length; i++) {
+          let sensorKey = sensorsToPlot[i];
+          let color = colors[sensorKey];
+          let label = portLabels[portKeys.indexOf(sensorKey)];
+          
+          // Legend line
+          stroke(color[0], color[1], color[2]);
+          strokeWeight(2);
+          let legendX = x + 45 + (i * 80);
+          line(legendX, legendY, legendX + 20, legendY);
+          
+          // Legend text
+          noStroke();
+          fill(200);
+          textAlign(LEFT, CENTER);
+          textSize(10);
+          text(label, legendX + 25, legendY);
         }
       }
 
