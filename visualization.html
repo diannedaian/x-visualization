@@ -436,7 +436,7 @@
 
     // Exponential Moving Average - more stable than simple moving average
     // a higher alpha value means more weight to the current value ! 
-    function calculateEMA(key, data, index, alpha = 0.7) {
+    function calculateEMA(key, data, index, alpha = 0.8) {
         if (index === 0) {
             return data[0][key]; // if no previous value, return the first value
         }
