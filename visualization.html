@@ -590,6 +590,7 @@
         updateMotionTab();
 
         // Record motion data if recording
+        console.log('handleNewData called, isRecording:', isRecording, 'dataPoints length:', dataPoints.length);
         if (isRecording) {
           currentMotionData.push({
             timestamp: data.timestamp,
@@ -608,6 +609,11 @@
           const dataPointsEl = document.getElementById('data-points');
           if (dataPointsEl) {
             dataPointsEl.textContent = `Data points: ${currentMotionData.length}`;
+          }
+        } else {
+          // Only log occasionally to avoid spam
+          if (Math.random() < 0.01) { // 1% chance to log
+            console.log('handleNewData called, isRecording:', isRecording, 'dataPoints length:', dataPoints.length);
           }
         }
       }
@@ -684,6 +690,41 @@
       function draw() {
         background(26, 26, 26);
         
+        // Check tab state FIRST - before any plotting
+        const realtimeTab = document.getElementById('realtime');
+        const isRealtimeTabActive = realtimeTab && realtimeTab.classList.contains('active');
+        const motionTab = document.getElementById('motion');
+        const isMotionTabActive = motionTab && motionTab.classList.contains('active');
+        const settingsTab = document.getElementById('settings');
+        const isSettingsTabActive = settingsTab && settingsTab.classList.contains('active');
+        
+        if (isMotionTabActive) {
+          console.log('Motion tab is active, calling drawMotionTab()');
+          drawMotionTab();
+          return; // Exit early for motion tab
+        } else {
+          console.log('Motion tab is NOT active. Active tab:', {
+            isRealtimeTabActive,
+            isMotionTabActive,
+            isSettingsTabActive
+          });
+        }
+        
+        if (!isRealtimeTabActive) {
+          // On settings tab, just draw a background to show the canvas area
+          fill(26, 26, 26);
+          noStroke();
+          rect(0, 0, width, height);
+          
+          // Draw a subtle indicator that this is the canvas area
+          fill(100);
+          textAlign(CENTER, CENTER);
+          textSize(16);
+          text("Canvas Area", width/2, height/2);
+          return; // Exit early for settings tab
+        }
+        
+        // Only draw plots if we're on the Real-time Data tab
         // Calculate dynamic sizes to match setup() with side padding
         let containerWidth = document.querySelector('.container').offsetWidth;
         let sidePadding = 60; // Black padding on each side
@@ -748,25 +789,6 @@
         
         // Row 4: Combined right sensors
         drawCombinedPlot(startX, paddingY + 3 * (plotHeight + paddingY), totalPlotWidth, plotHeight, "right", "All Right Sensors");
-        
-        // Row 5: Motion data (only on motion tab) - COMMENTED OUT
-        /*
-        const motionTab = document.getElementById('motion');
-        const isMotionTabActive = motionTab && motionTab.classList.contains('active');
-        
-        // Only log when tab state changes (store previous state)
-        if (typeof draw.previousTabState === 'undefined') {
-          draw.previousTabState = isMotionTabActive;
-          console.log('Initial tab state:', isMotionTabActive);
-        } else if (draw.previousTabState !== isMotionTabActive) {
-          console.log('Tab state changed from', draw.previousTabState, 'to', isMotionTabActive);
-          draw.previousTabState = isMotionTabActive;
-        }
-        
-        if (isMotionTabActive) {
-          drawMotion();
-        }
-        */ 
       }
 
       function drawCombinedPlot(x, y, w, h, sensorGroup, label) {
@@ -1167,6 +1189,8 @@
       }
 
       function setupMotionControls() {
+        console.log('setupMotionControls() called');
+        
         const recordBtn = document.getElementById('record-btn');
         const stopBtn = document.getElementById('stop-btn');
         const exportBtn = document.getElementById('export-motion-btn');
@@ -1174,8 +1198,23 @@
         const motionNameInput = document.getElementById('motion-name');
         const motionDropdown = document.getElementById('motion-dropdown');
 
+        console.log('Found elements:', { 
+          recordBtn: !!recordBtn, 
+          stopBtn: !!stopBtn, 
+          exportBtn: !!exportBtn, 
+          addBtn: !!addBtn, 
+          motionNameInput: !!motionNameInput, 
+          motionDropdown: !!motionDropdown 
+        });
+
         if (recordBtn) {
-          recordBtn.addEventListener('click', startRecording);
+          console.log('Adding click listener to record button');
+          recordBtn.addEventListener('click', function() {
+            console.log('Record button clicked!');
+            startRecording();
+          });
+        } else {
+          console.error('Record button not found!');
         }
         if (stopBtn) {
           stopBtn.addEventListener('click', stopRecording);
@@ -1240,13 +1279,18 @@
       }
 
       function startRecording() {
+        console.log('startRecording() called');
+        
         const motionName = document.getElementById('motion-name').value.trim();
+        console.log('Motion name:', motionName);
+        
         if (!motionName) {
           alert('Please enter a motion name first!');
           return;
         }
 
         isRecording = true;
+        console.log('isRecording set to true');
         windowResized(); // Ensure canvas resizes for motion plot
         currentMotionName = motionName;
         currentMotionData = [];
@@ -1291,6 +1335,10 @@
           
           recordedMotions.push(motion);
           console.log(`Recorded motion: ${currentMotionName} with ${currentMotionData.length} data points`);
+          console.log('Total recorded motions:', recordedMotions.length);
+          console.log('Last recorded motion data length:', recordedMotions[recordedMotions.length - 1].data.length);
+        } else {
+          console.log('No motion data to save - currentMotionData is empty');
         }
 
         // Update UI
@@ -1449,6 +1497,84 @@
       }
       */
 
+      // ===== MOTION TAB DRAWING FUNCTION =====
+      
+      function drawMotionTab() {
+        console.log('drawMotionTab() called');
+        
+        // Calculate dynamic sizes to match setup() with side padding
+        let containerWidth = document.querySelector('.container').offsetWidth;
+        let sidePadding = 60; // Black padding on each side
+        let availableWidth = containerWidth - (2 * sidePadding);
+        let plotWidth = Math.floor(availableWidth / 4);
+        let plotHeight = 180;
+        let paddingX = 20;
+        let paddingY = 40;
+        
+        // Calculate the total width of all plots in a row and center them
+        let totalPlotWidth = 4 * plotWidth + 3 * paddingX;
+        let startX = sidePadding + (availableWidth - totalPlotWidth) / 2; // Center the plots
+        
+        console.log('Motion tab dimensions:', { startX, totalPlotWidth, plotHeight });
+        
+        // Draw row title for motion data
+        fill(255);
+        noStroke();
+        textAlign(CENTER, TOP);
+        textSize(16);
+        textStyle(BOLD);
+        text("Motion Data", startX + totalPlotWidth / 2, paddingY - 25);
+        textStyle(NORMAL);
+        
+        // Show current motion data if recording and has data, otherwise show last recorded motion
+        let dataToShow = [];
+        if (isRecording && currentMotionData.length > 0) {
+          dataToShow = currentMotionData;
+        } else if (recordedMotions.length > 0) {
+          dataToShow = recordedMotions[recordedMotions.length - 1].data;
+        }
+        
+        console.log('Motion data to show:', { 
+          isRecording, 
+          currentMotionDataLength: currentMotionData.length, 
+          recordedMotionsLength: recordedMotions.length,
+          dataToShowLength: dataToShow.length 
+        });
+        
+        if (dataToShow.length > 0) {
+          console.log('Drawing motion data plot with', dataToShow.length, 'data points');
+          
+          // Temporarily replace dataPoints with motion data for plotting
+          let originalDataPoints = dataPoints;
+          dataPoints = dataToShow;
+          
+          // Draw motion data plot using existing function
+          drawCombinedPlot(startX, paddingY, totalPlotWidth, plotHeight, "all", "Motion Data");
+          
+          // Restore original dataPoints
+          dataPoints = originalDataPoints;
+          
+          // Show recording status on the plot
+          if (isRecording) {
+            fill(255, 255, 0);
+            textAlign(LEFT, TOP);
+            textSize(14);
+            text("RECORDING...", startX + 10, paddingY + 10);
+          }
+        } else {
+          console.log('Drawing empty motion plot');
+          
+          // Draw empty motion plot
+          drawCombinedPlot(startX, paddingY, totalPlotWidth, plotHeight, "all", "Motion Data");
+          
+          // Show instruction text
+          fill(150);
+          textAlign(CENTER, CENTER);
+          textSize(14);
+          text("Start recording to see motion data here", startX + totalPlotWidth/2, paddingY + plotHeight/2);
+        }
+      }
+      
       // ===== END MOTION RECOGNITION FUNCTIONS =====
     </script>
   </body>
