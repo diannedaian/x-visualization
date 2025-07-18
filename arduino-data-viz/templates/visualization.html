@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+
+{% block nav_visualization %}active{% endblock %}
+
+{% block content %}
+<div class="status">
+    <div id="connection-status">Connecting...</div>
+    <div class="controls">
+        <button id="clear-btn">Clear Data</button>
+        <button id="pause-btn">Pause</button>
+        <button id="export-btn">Export Data</button>
+    </div>
+</div>
+<div id="graph-container"></div>
+
+<div class="stats">
+    <div class="stat-card">
+        <div class="stat-label">Left 1</div>
+        <div class="stat-value" id="left-1-value">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Left 2</div>
+        <div class="stat-value" id="left-2-value">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Left 3</div>
+        <div class="stat-value" id="left-3-value">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Left 4</div>
+        <div class="stat-value" id="left-4-value">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Right 1</div>
+        <div class="stat-value" id="right-1-value">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Right 2</div>
+        <div class="stat-value" id="right-2-value">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Right 3</div>
+        <div class="stat-value" id="right-3-value">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Right 4</div>
+        <div class="stat-value" id="right-4-value">0</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+#graph-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+{% endblock %}
+
+{% block extra_scripts %}
+// Global variables - EXACT copy from original
+let dataPoints = [];
+let isPaused = false;
+let maxDataPoints = 50;
+let graphWidth, graphHeight;
+let graphX, graphY;
+let minY = 0, maxY = 1024; // Arduino analog range
+let autoScale = true;
+
+// Colors for each data stream - EXACT copy from original
+const colors = {
+    left_1: [255, 107, 107], // Red
+    left_2: [255, 159, 67], // Orange
+    left_3: [255, 221, 89], // Yellow
+    left_4: [38, 222, 129], // Green
+    right_1: [78, 205, 196], // Teal
+    right_2: [69, 183, 209], // Blue
+    right_3: [75, 123, 236], // Indigo
+    right_4: [165, 94, 234], // Purple
+};
+const portLabels = [
+    "Left 1",
+    "Left 2",
+    "Left 3",
+    "Left 4",
+    "Right 1",
+    "Right 2",
+    "Right 3",
+    "Right 4",
+];
+const portKeys = [
+    "left_1",
+    "left_2",
+    "left_3",
+    "left_4",
+    "right_1",
+    "right_2",
+    "right_3",
+    "right_4",
+];
+
+function setup() {
+    console.log("setup() function is running");
+    // Calculate canvas size to fill the available space with side padding
+    let containerWidth = document.querySelector(".container").offsetWidth;
+    let sidePadding = 60; // Black padding on each side
+    let availableWidth = containerWidth - 2 * sidePadding;
+    let plotWidth = Math.floor(availableWidth / 4); // 4 columns
+    let plotHeight = 180;
+    let paddingX = 20;
+    let paddingY = 40;
+    let cols = 4;
+    let rows = 4;
+    let titleHeight = 30; // Reduced space for row titles
+
+    // Calculate total canvas size (full container width with side padding)
+    let canvasWidth = containerWidth;
+    let canvasHeight =
+        rows * plotHeight + (rows - 1) * paddingY + titleHeight;
+
+    let canvas = createCanvas(canvasWidth, canvasHeight);
+    canvas.parent("graph-container");
+    setupEventListeners();
+}
+
+function handleNewData(data) {
+    // Add timestamp for x-axis
+    data.displayTime = millis();
+
+    // Add to data array
+    dataPoints.push(data);
+
+    // Keep only recent data points
+    if (dataPoints.length > maxDataPoints) {
+        dataPoints.shift();
+    }
+
+    // Update auto-scaling
+    if (autoScale) {
+        updateScale();
+    }
+
+    // Update real-time stats
+    updateStats(data);
+
+    // Calculate EMA for the new data point
+    data.ema = {};
+    for (let key of portKeys) {
+        data.ema[key] = calculateEMA(
+            key,
+            dataPoints,                 // ← This is the array WITHOUT the new data point
+            dataPoints.length - 1
+        );
+    }
+}
+
+function updateScale() {
+    if (dataPoints.length === 0) return;
+
+    let tempMinY = Infinity;
+    let tempMaxY = -Infinity;
+
+    dataPoints.forEach((point) => {
+        tempMinY = Math.min(
+            tempMinY,
+            point.left_1,
+            point.left_2,
+            point.left_3,
+            point.left_4,
+            point.right_1,
+            point.right_2,
+            point.right_3,
+            point.right_4
+        );
+        tempMaxY = Math.max(
+            tempMaxY,
+            point.left_1,
+            point.left_2,
+            point.left_3,
+            point.left_4,
+            point.right_1,
+            point.right_2,
+            point.right_3,
+            point.right_4
+        );
+    });
+
+    // Add some padding
+    let padding = (tempMaxY - tempMinY) * 0.1;
+    minY = tempMinY - padding;
+    maxY = tempMaxY + padding;
+
+    // Ensure minimum range
+    if (maxY - minY < 10) {
+        let center = (maxY + minY) / 2;
+        minY = center - 5;
+        maxY = center + 5;
+    }
+}
+
+function updateStats(data) {
+    document.getElementById("left-1-value").textContent =
+        data.left_1.toFixed(1);
+    document.getElementById("left-2-value").textContent =
+        data.left_2.toFixed(1);
+    document.getElementById("left-3-value").textContent =
+        data.left_3.toFixed(1);
+    document.getElementById("left-4-value").textContent =
+        data.left_4.toFixed(1);
+    document.getElementById("right-1-value").textContent =
+        data.right_1.toFixed(1);
+    document.getElementById("right-2-value").textContent =
+        data.right_2.toFixed(1);
+    document.getElementById("right-3-value").textContent =
+        data.right_3.toFixed(1);
+    document.getElementById("right-4-value").textContent =
+        data.right_4.toFixed(1);
+}
+
+function draw() {
+    background(26, 26, 26);
+
+    // Calculate dynamic sizes to match setup() with side padding
+    let containerWidth = document.querySelector(".container").offsetWidth;
+    let sidePadding = 60; // Black padding on each side
+    let availableWidth = containerWidth - 2 * sidePadding;
+    let plotWidth = Math.floor(availableWidth / 4);
+    let plotHeight = 180;
+    let paddingX = 20;
+    let paddingY = 40;
+    let cols = 4;
+    let rows = 4;
+
+    // Calculate the total width of all plots in a row and center them
+    let totalPlotWidth = 4 * plotWidth + 3 * paddingX;
+    let startX = sidePadding + (availableWidth - totalPlotWidth) / 2; // Center the plots
+
+    // Draw row titles
+    fill(255);
+    noStroke();
+    textAlign(CENTER, TOP);
+    textSize(16);
+    textStyle(BOLD);
+    text("Left Sensors", startX + totalPlotWidth / 2, paddingY - 25);
+    text(
+        "All Left Sensors",
+        startX + totalPlotWidth / 2,
+        paddingY + plotHeight + paddingY - 25
+    );
+    text(
+        "Right Sensors",
+        startX + totalPlotWidth / 2,
+        paddingY + 2 * (plotHeight + paddingY) - 25
+    );
+    text(
+        "All Right Sensors",
+        startX + totalPlotWidth / 2,
+        paddingY + 3 * (plotHeight + paddingY) - 25
+    );
+    textStyle(NORMAL);
+
+    // Row 1: Individual left sensors
+    for (let i = 0; i < 4; i++) {
+        let col = i % 4;
+        let x0 = startX + col * (plotWidth + paddingX);
+        let y0 = paddingY;
+        drawMiniPlot(
+            x0,
+            y0,
+            plotWidth,
+            plotHeight,
+            portKeys[i],
+            portLabels[i],
+            colors[portKeys[i]]
+        );
+    }
+
+    // Row 2: Combined left sensors
+    drawCombinedPlot(
+        startX,
+        paddingY + plotHeight + paddingY,
+        totalPlotWidth,
+        plotHeight,
+        "left",
+        "All Left Sensors"
+    );
+
+    // Row 3: Individual right sensors
+    for (let i = 4; i < 8; i++) {
+        let col = (i - 4) % 4;
+        let x0 = startX + col * (plotWidth + paddingX);
+        let y0 = paddingY + 2 * (plotHeight + paddingY);
+        drawMiniPlot(
+            x0,
+            y0,
+            plotWidth,
+            plotHeight,
+            portKeys[i],
+            portLabels[i],
+            colors[portKeys[i]]
+        );
+    }
+
+    // Row 4: Combined right sensors
+    drawCombinedPlot(
+        startX,
+        paddingY + 3 * (plotHeight + paddingY),
+        totalPlotWidth,
+        plotHeight,
+        "right",
+        "All Right Sensors"
+    );
+}
+
+function drawCombinedPlot(x, y, w, h, sensorGroup, label) {
+    // Draw background
+    fill(40, 40, 40);
+    stroke(80);
+    rect(x, y, w, h, 8);
+
+    // Draw axes
+    stroke(200);
+    strokeWeight(1);
+    // Y axis
+    line(x + 40, y + 10, x + 40, y + h - 30);
+    // X axis
+    line(x + 40, y + h - 30, x + w - 10, y + h - 30);
+
+    // Y axis labels (0, 2500, 5000)
+    fill(200);
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(10);
+    text("5000", x + 35, y + 20);
+    text("2500", x + 35, y + (h - 20) / 2);
+    text("0", x + 35, y + h - 30);
+
+    // X axis label
+    textAlign(CENTER, TOP);
+    textSize(10);
+    text("Time", x + w / 2, y + h - 18);
+
+    // Draw label
+    noStroke();
+    fill(255);
+    textAlign(LEFT, TOP);
+    textSize(14);
+    text(label, x + 45, y + 12);
+
+    // Determine which sensors to plot based on sensorGroup
+    let sensorsToPlot = [];
+    if (sensorGroup === "left") {
+        sensorsToPlot = ["left_1", "left_2", "left_3", "left_4"];
+    } else if (sensorGroup === "right") {
+        sensorsToPlot = ["right_1", "right_2", "right_3", "right_4"];
+    } else if (sensorGroup === "all") {
+        sensorsToPlot = [
+            "left_1",
+            "left_2",
+            "left_3",
+            "left_4",
+            "right_1",
+            "right_2",
+            "right_3",
+            "right_4",
+        ];
+    }
+
+    // Draw data lines for each sensor
+    if (dataPoints.length > 1) {
+        for (let sensorKey of sensorsToPlot) {
+            let color = colors[sensorKey];
+
+            // Plot the smoothed data
+            stroke(color[0], color[1], color[2]);
+            strokeWeight(2);
+            noFill();
+            beginShape();
+            for (let i = 0, n = dataPoints.length; i < n; i++) {
+                let smoothedValue;
+                if (
+                    dataPoints[i].ema &&
+                    dataPoints[i].ema[sensorKey] !== undefined
+                ) {
+                    smoothedValue = dataPoints[i].ema[sensorKey];
+                } else {
+                    // Fallback to raw value if EMA doesn't exist
+                    smoothedValue = dataPoints[i][sensorKey];
+                }
+
+                if (smoothedValue < 0) {
+                    smoothedValue = 0;
+                } else if (smoothedValue > 5000) {
+                    smoothedValue = 5000;
+                }
+
+                let px = map(i, 0, maxDataPoints - 1, x + 40, x + w - 10);
+                let py = map(smoothedValue, 0, 5000, y + h - 30, y + 10);
+                vertex(px, py);
+            }
+            endShape();
+        }
+    }
+
+    // Draw current value dots for each sensor
+    let n = dataPoints.length;
+    if (n > 0) {
+        for (let i = 0; i < sensorsToPlot.length; i++) {
+            let sensorKey = sensorsToPlot[i];
+            let color = colors[sensorKey];
+            let latest = Math.max(
+                0,
+                Math.min(5000, dataPoints[n - 1][sensorKey])
+            );
+            let px = x + w - 15 - i * 20; // Offset dots horizontally
+            let py = map(latest, 0, 5000, y + h - 30, y + 10);
+
+            fill(color[0], color[1], color[2]);
+            stroke(255);
+            ellipse(px, py, 8, 8);
+
+            // Show latest value
+            noStroke();
+            fill(230);
+            textAlign(LEFT, TOP);
+            textSize(10);
+            text(latest.toFixed(1), px + 10, py - 5);
+        }
+    }
+
+    // Draw legend
+    let legendY = y + h - 15;
+    for (let i = 0; i < sensorsToPlot.length; i++) {
+        let sensorKey = sensorsToPlot[i];
+        let color = colors[sensorKey];
+        let label = portLabels[portKeys.indexOf(sensorKey)];
+
+        // Legend line
+        stroke(color[0], color[1], color[2]);
+        strokeWeight(2);
+        let legendX = x + 45 + i * 80;
+        line(legendX, legendY, legendX + 20, legendY);
+
+        // Legend text
+        noStroke();
+        fill(200);
+        textAlign(LEFT, CENTER);
+        textSize(10);
+        text(label, legendX + 25, legendY);
+    }
+}
+
+function drawMiniPlot(x, y, w, h, key, label, color) {
+    // Draw background
+    fill(40, 40, 40);
+    stroke(80);
+    rect(x, y, w, h, 8);
+    // Draw axes
+    stroke(200);
+    strokeWeight(1);
+    // Y axis
+    line(x + 40, y + 10, x + 40, y + h - 30);
+    // X axis
+    line(x + 40, y + h - 30, x + w - 10, y + h - 30);
+    // Y axis labels (0, 2500, 5000)
+    fill(200);
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(10);
+    text("5000", x + 35, y + 20);
+    text("2500", x + 35, y + (h - 20) / 2);
+    text("0", x + 35, y + h - 30);
+    // X axis label
+    textAlign(CENTER, TOP);
+    textSize(10);
+    text("Time", x + w / 2, y + h - 18);
+
+    // Draw current value dot
+    let n = dataPoints.length;
+    if (n > 0) {
+        let latest = Math.max(0, Math.min(5000, dataPoints[n - 1][key]));
+        let px = x + w - 15;
+        let py = map(latest, 0, 5000, y + h - 30, y + 10);
+        fill(color[0], color[1], color[2]);
+        stroke(255);
+        ellipse(px, py, 8, 8);
+        // Show latest value
+        noStroke();
+        fill(230);
+        textAlign(LEFT, TOP);
+        textSize(12);
+        text(latest.toFixed(1), x + w - 50, y + 12);
+    }
+    // Draw label
+    noStroke();
+    fill(color[0], color[1], color[2]);
+    textAlign(LEFT, TOP);
+    textSize(14);
+    text(label, x + 45, y + 12);
+
+    // Draw smooth data line
+    if (dataPoints.length > 1) {
+        // Plot the smoothed data using stored values
+        stroke(color[0], color[1], color[2]);
+        strokeWeight(2);
+        noFill();
+        beginShape();
+        for (let i = 0, n = dataPoints.length; i < n; i++) {
+            let smoothedValue;
+            if (dataPoints[i].ema && dataPoints[i].ema[key] !== undefined) {
+                smoothedValue = dataPoints[i].ema[key];
+            } else {
+                // Fallback to raw value if EMA doesn't exist
+                smoothedValue = dataPoints[i][key];
+            }
+
+            if (smoothedValue < 0) {
+                smoothedValue = 0;
+            } else if (smoothedValue > 5000) {
+                smoothedValue = 5000;
+            }
+
+            let px = map(i, 0, maxDataPoints - 1, x + 40, x + w - 10);
+            let py = map(smoothedValue, 0, 5000, y + h - 30, y + 10);
+            vertex(px, py);
+        }
+        endShape();
+    }
+}
+
+// Exponential Moving Average - more stable than simple moving average
+// a higher alpha value means more weight to the current value !
+function calculateEMA(key, data, index, alpha = 0.8) {
+    if (index === 0) {
+        return data[0][key]; // if no previous value, return the first value
+    }
+    let currentValue = data[index][key];
+    let previousEMA = data[index - 1].ema
+        ? data[index - 1].ema[key]
+        : data[index - 1][key]; // previous EMA value or previous raw value if no EMA value
+    return alpha * currentValue + (1 - alpha) * previousEMA; // averages prevEMA & currentEMA, weighting the current value more heavily (alpha > 0.5)
+}
+
+function setupEventListeners() {
+    document
+        .getElementById("clear-btn")
+        .addEventListener("click", function () {
+            dataPoints = [];
+        });
+
+    document
+        .getElementById("pause-btn")
+        .addEventListener("click", function () {
+            isPaused = !isPaused;
+            this.textContent = isPaused ? "Resume" : "Pause";
+            this.style.backgroundColor = isPaused ? "#ff9800" : "#4CAF50";
+        });
+
+    document
+        .getElementById("export-btn")
+        .addEventListener("click", function () {
+            exportData();
+        });
+}
+
+function exportData() {
+    if (dataPoints.length === 0) {
+        alert("No data to export");
+        return;
+    }
+
+    let csv =
+        "timestamp,left_1,left_2,left_3,left_4,right_1,right_2,right_3,right_4\n";
+    dataPoints.forEach((point) => {
+        csv += `${point.timestamp},${point.left_1},${point.left_2},${point.left_3},${point.left_4},${point.right_1},${point.right_2},${point.right_3},${point.right_4}\n`;
+    });
+
+    let blob = new Blob([csv], { type: "text/csv" });
+    let url = window.URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "arduino_data.csv";
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// Keyboard shortcuts
+function keyPressed() {
+    if (key === "c" || key === "C") {
+        dataPoints = [];
+    }
+    if (key === "p" || key === "P") {
+        isPaused = !isPaused;
+        document.getElementById("pause-btn").click();
+    }
+    if (key === "s" || key === "S") {
+        autoScale = !autoScale;
+        if (!autoScale) {
+            minY = 0;
+            maxY = 1024;
+        }
+    }
+}
+
+// Handle window resize
+function windowResized() {
+    // Recalculate canvas size when window is resized
+    let containerWidth = document.querySelector(".container").offsetWidth;
+    let sidePadding = 60; // Black padding on each side
+    let availableWidth = containerWidth - 2 * sidePadding;
+    let plotWidth = Math.floor(availableWidth / 4);
+    let plotHeight = 180;
+    let paddingX = 20;
+    let paddingY = 40;
+    let cols = 4;
+    let rows = 4;
+    let titleHeight = 30;
+
+    let canvasWidth = containerWidth;
+    let canvasHeight =
+        rows * plotHeight + (rows - 1) * paddingY + titleHeight;
+
+    resizeCanvas(canvasWidth, canvasHeight);
+}
+
+// Handle Arduino data
+socket.on("arduino_data", function (data) {
+    if (!isPaused) {
+        handleNewData(data);
+    }
+});
+
+socket.on("server_status", function (data) {
+    console.log("Server status:", data.message);
+});
+{% endblock %}

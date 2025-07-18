@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block nav_settings %}active{% endblock %}
+
+{% block extra_styles %}
+.settings-content {
+    max-width: 400px;
+}
+
+.setting-group {
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.setting-group label {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.setting-group input[type="number"] {
+    width: 100px;
+    padding: 5px;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background-color: #444;
+    color: white;
+}
+
+.setting-group input[type="checkbox"] {
+    margin-right: 10px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="status">
+    <div id="connection-status">Connecting...</div>
+    <div class="controls">
+        <button id="clear-btn">Clear Data</button>
+        <button id="pause-btn">Pause</button>
+        <button id="export-btn">Export Data</button>
+    </div>
+</div>
+
+<div class="stat-card">
+    <h2>Settings</h2>
+    <div class="settings-content">
+        <div class="setting-group">
+            <label for="max-data-points">Max Data Points:</label>
+            <input
+                type="number"
+                id="max-data-points"
+                value="50"
+                min="10"
+                max="200"
+            />
+        </div>
+        <div class="setting-group">
+            <label for="update-interval">Update Interval (ms):</label>
+            <input
+                type="number"
+                id="update-interval"
+                value="100"
+                min="50"
+                max="1000"
+            />
+        </div>
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="auto-scale" checked /> Auto-scale
+                graphs
+            </label>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+console.log("Settings page loaded");
+
+// Load settings from localStorage on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadSettings();
+});
+
+function loadSettings() {
+    const settings = JSON.parse(localStorage.getItem('arduinoSettings')) || {};
+
+    document.getElementById('max-data-points').value = settings.maxDataPoints || 50;
+    document.getElementById('update-interval').value = settings.updateInterval || 100;
+    document.getElementById('auto-scale').checked = settings.autoScale !== false;
+}
+
+function saveSettings() {
+    const settings = {
+        maxDataPoints: parseInt(document.getElementById('max-data-points').value),
+        updateInterval: parseInt(document.getElementById('update-interval').value),
+        autoScale: document.getElementById('auto-scale').checked
+    };
+
+    localStorage.setItem('arduinoSettings', JSON.stringify(settings));
+
+    // Emit settings to server
+    socket.emit('update_settings', settings);
+
+    console.log('Settings saved:', settings);
+}
+
+// Auto-save settings when changed
+document.getElementById('max-data-points').addEventListener('change', saveSettings);
+document.getElementById('update-interval').addEventListener('change', saveSettings);
+document.getElementById('auto-scale').addEventListener('change', saveSettings);
+
+// Handle socket events
+socket.on("server_status", function (data) {
+    console.log("Server status:", data.message);
+});
+
+socket.on("settings_updated", function (data) {
+    if (data.status === 'success') {
+        console.log('Settings updated on server');
+    }
+});
+{% endblock %}

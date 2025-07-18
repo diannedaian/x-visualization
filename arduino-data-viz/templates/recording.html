@@ -1,0 +1,1064 @@
+{% extends "base.html" %}
+
+{% block nav_recording %}active{% endblock %}
+
+{% block extra_styles %}
+/* Motion Recognition Tab Styles */
+.analysis-content {
+    margin-top: 20px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.stat-item {
+    background-color: #444;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.stat-item strong {
+    color: #4caf50;
+}
+
+/* Motion Selection Styles */
+.motion-input-group,
+.motion-dropdown-group {
+    margin-bottom: 15px;
+}
+
+.motion-input-group label,
+.motion-dropdown-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #ccc;
+}
+
+.input-with-button {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.input-with-button input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background-color: #444;
+    color: white;
+    font-size: 14px;
+}
+
+.add-btn {
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+    white-space: nowrap;
+}
+
+.add-btn:hover {
+    background-color: #1976d2;
+}
+
+.add-btn:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+
+.motion-dropdown-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background-color: #444;
+    color: white;
+    font-size: 14px;
+}
+
+.motion-input-group input:focus,
+.motion-dropdown-group select:focus {
+    outline: none;
+    border-color: #4caf50;
+}
+
+.motion-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.motion-btn {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.motion-btn:hover {
+    background-color: #45a049;
+}
+
+.motion-btn:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+
+.motion-btn.recording {
+    background-color: #f44336;
+}
+
+.motion-btn.recording:hover {
+    background-color: #d32f2f;
+}
+
+/* Recording Status Styles */
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.ready {
+    background-color: #4caf50;
+}
+
+.status-dot.recording {
+    background-color: #f44336;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+.recording-info p {
+    margin: 5px 0;
+    font-size: 14px;
+    color: #ccc;
+}
+
+.recording-info p strong {
+    color: #4caf50;
+}
+
+#graph-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="status">
+    <div id="connection-status">Connecting...</div>
+    <div class="controls">
+        <button id="clear-btn">Clear Data</button>
+        <button id="pause-btn">Pause</button>
+        <button id="export-btn">Export Data</button>
+    </div>
+</div>
+
+<div class="analysis-content">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Instructions</h3>
+            <div id="instructions" style="text-align: left">
+                <p>1. Add motion name or select an existing motion</p>
+                <p>2. Press the "Record" button</p>
+                <p>3. Move your model in the desired motion</p>
+                <p>
+                    4. If it's the first trial, press the "Stop" button to
+                    establish the motion's duration
+                </p>
+                <p>
+                    5. After all trials, press the "Export" button to save the
+                    motion data
+                </p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <h3>Motion Selection</h3>
+            <div id="motion-selection">
+                <div class="motion-input-group">
+                    <label for="motion-name">Add Motion Name:</label>
+                    <div class="input-with-button">
+                        <input
+                            type="text"
+                            id="motion-name"
+                            placeholder="Enter motion name (e.g., 'wave', 'circle')"
+                        />
+                        <button id="add-motion-btn" class="add-btn">Add</button>
+                    </div>
+                </div>
+                <div class="motion-dropdown-group">
+                    <label for="motion-dropdown">Select a Motion:</label>
+                    <select id="motion-dropdown">
+                        <option value="">-- Select Motion --</option>
+                    </select>
+                </div>
+                <div class="motion-controls">
+                    <button id="record-btn" class="motion-btn">Record</button>
+                    <button id="stop-btn" class="motion-btn" disabled>
+                        Stop
+                    </button>
+                    <button id="export-motion-btn" class="motion-btn" disabled>
+                        Export
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <h3>Recording Status</h3>
+            <div id="recording-status">
+                <div class="status-indicator">
+                    <span id="status-text">Ready to record</span>
+                    <div id="status-dot" class="status-dot ready"></div>
+                </div>
+                <div class="recording-info">
+                    <p id="current-motion">No motion selected</p>
+                    <p id="data-points">Data points: 0</p>
+                    <p id="recording-time">Time: 0s</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="graph-container"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+console.log("JavaScript is loading...");
+// Global variables
+let dataPoints = [];
+let isPaused = false;
+let maxDataPoints = 50;
+let graphWidth, graphHeight;
+let graphX, graphY;
+let minY = 0, maxY = 1024; // Arduino analog range
+let autoScale = true;
+
+// Colors for each data stream
+const colors = {
+    left_1: [255, 107, 107], // Red
+    left_2: [255, 159, 67], // Orange
+    left_3: [255, 221, 89], // Yellow
+    left_4: [38, 222, 129], // Green
+    right_1: [78, 205, 196], // Teal
+    right_2: [69, 183, 209], // Blue
+    right_3: [75, 123, 236], // Indigo
+    right_4: [165, 94, 234], // Purple
+};
+const portLabels = [
+    "Left 1",
+    "Left 2",
+    "Left 3",
+    "Left 4",
+    "Right 1",
+    "Right 2",
+    "Right 3",
+    "Right 4",
+];
+const portKeys = [
+    "left_1",
+    "left_2",
+    "left_3",
+    "left_4",
+    "right_1",
+    "right_2",
+    "right_3",
+    "right_4",
+];
+
+function setup() {
+    console.log("setup() function is running");
+    // Calculate canvas size to fill the available space with side padding
+    let containerWidth = document.querySelector(".container").offsetWidth;
+    let sidePadding = 60; // Black padding on each side
+    let availableWidth = containerWidth - 2 * sidePadding;
+    let plotWidth = Math.floor(availableWidth / 4); // 4 columns
+    let plotHeight = 180;
+    let paddingX = 20;
+    let paddingY = 40;
+    let cols = 4;
+    let rows = 4;
+    let titleHeight = 30; // Reduced space for row titles
+
+    // Calculate total canvas size (full container width with side padding)
+    let canvasWidth = containerWidth;
+    let canvasHeight =
+        rows * plotHeight + (rows - 1) * paddingY + titleHeight;
+
+    // Always add extra height for motion plot to ensure consistent canvas size across all tabs
+    canvasHeight += plotHeight + paddingY;
+
+    let canvas = createCanvas(canvasWidth, canvasHeight);
+    canvas.parent("graph-container");
+    setupEventListeners();
+    setupMotionControls();
+}
+
+function handleNewData(data) {
+    // Add timestamp for x-axis
+    data.displayTime = millis();
+
+    // Add to data array
+    dataPoints.push(data);
+
+    // Keep only recent data points
+    if (dataPoints.length > maxDataPoints) {
+        dataPoints.shift();
+    }
+
+    // Update auto-scaling
+    if (autoScale) {
+        updateScale();
+    }
+
+    // Calculate EMA for the new data point
+    data.ema = {};
+    for (let key of portKeys) {
+        data.ema[key] = calculateEMA(
+            key,
+            dataPoints,                 // ← This is the array WITHOUT the new data point
+            dataPoints.length - 1
+        );
+    }
+
+    // Update motion tab if it's active
+    updateMotionTab();
+
+    // Record motion data if recording
+    console.log(
+        "handleNewData called, isRecording:",
+        isRecording,
+        "dataPoints length:",
+        dataPoints.length
+    );
+    if (isRecording) {
+        currentMotionData.push({
+            timestamp: data.timestamp,
+            left_1: data.left_1,
+            left_2: data.left_2,
+            left_3: data.left_3,
+            left_4: data.left_4,
+            right_1: data.right_1,
+            right_2: data.right_2,
+            right_3: data.right_3,
+            right_4: data.right_4,
+        });
+        console.log(
+            `Recording motion data point ${currentMotionData.length}:`,
+            data
+        );
+
+        // Update data points count in real-time
+        const dataPointsEl = document.getElementById("data-points");
+        if (dataPointsEl) {
+            dataPointsEl.textContent = `Data points: ${currentMotionData.length}`;
+        }
+    } else {
+        // Only log occasionally to avoid spam
+        if (Math.random() < 0.01) {
+            // 1% chance to log
+            console.log(
+                "handleNewData called, isRecording:",
+                isRecording,
+                "dataPoints length:",
+                dataPoints.length
+            );
+        }
+    }
+}
+
+function updateScale() {
+    if (dataPoints.length === 0) return;
+
+    let tempMinY = Infinity;
+    let tempMaxY = -Infinity;
+
+    dataPoints.forEach((point) => {
+        tempMinY = Math.min(
+            tempMinY,
+            point.left_1,
+            point.left_2,
+            point.left_3,
+            point.left_4,
+            point.right_1,
+            point.right_2,
+            point.right_3,
+            point.right_4
+        );
+        tempMaxY = Math.max(
+            tempMaxY,
+            point.left_1,
+            point.left_2,
+            point.left_3,
+            point.left_4,
+            point.right_1,
+            point.right_2,
+            point.right_3,
+            point.right_4
+        );
+    });
+
+    // Add some padding
+    let padding = (tempMaxY - tempMinY) * 0.1;
+    minY = tempMinY - padding;
+    maxY = tempMaxY + padding;
+
+    // Ensure minimum range
+    if (maxY - minY < 10) {
+        let center = (maxY + minY) / 2;
+        minY = center - 5;
+        maxY = center + 5;
+    }
+}
+
+function draw() {
+    background(26, 26, 26);
+
+    console.log("Motion tab is active, calling drawMotionTab()");
+    drawMotionTab();
+}
+
+function drawCombinedPlot(x, y, w, h, sensorGroup, label) {
+    // Draw background
+    fill(40, 40, 40);
+    stroke(80);
+    rect(x, y, w, h, 8);
+
+    // Draw axes
+    stroke(200);
+    strokeWeight(1);
+    // Y axis
+    line(x + 40, y + 10, x + 40, y + h - 30);
+    // X axis
+    line(x + 40, y + h - 30, x + w - 10, y + h - 30);
+
+    // Y axis labels (0, 2500, 5000)
+    fill(200);
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(10);
+    text("5000", x + 35, y + 20);
+    text("2500", x + 35, y + (h - 20) / 2);
+    text("0", x + 35, y + h - 30);
+
+    // X axis label
+    textAlign(CENTER, TOP);
+    textSize(10);
+    text("Time", x + w / 2, y + h - 18);
+
+    // Draw label
+    noStroke();
+    fill(255);
+    textAlign(LEFT, TOP);
+    textSize(14);
+    text(label, x + 45, y + 12);
+
+    // Determine which sensors to plot based on sensorGroup
+    let sensorsToPlot = [];
+    if (sensorGroup === "left") {
+        sensorsToPlot = ["left_1", "left_2", "left_3", "left_4"];
+    } else if (sensorGroup === "right") {
+        sensorsToPlot = ["right_1", "right_2", "right_3", "right_4"];
+    } else if (sensorGroup === "all") {
+        sensorsToPlot = [
+            "left_1",
+            "left_2",
+            "left_3",
+            "left_4",
+            "right_1",
+            "right_2",
+            "right_3",
+            "right_4",
+        ];
+    }
+
+    // Draw data lines for each sensor
+    if (dataPoints.length > 1) {
+        for (let sensorKey of sensorsToPlot) {
+            let color = colors[sensorKey];
+
+            // Plot the smoothed data
+            stroke(color[0], color[1], color[2]);
+            strokeWeight(2);
+            noFill();
+            beginShape();
+            for (let i = 0, n = dataPoints.length; i < n; i++) {
+                let smoothedValue;
+                if (
+                    dataPoints[i].ema &&
+                    dataPoints[i].ema[sensorKey] !== undefined
+                ) {
+                    smoothedValue = dataPoints[i].ema[sensorKey];
+                } else {
+                    // Fallback to raw value if EMA doesn't exist
+                    smoothedValue = dataPoints[i][sensorKey];
+                }
+
+                if (smoothedValue < 0) {
+                    smoothedValue = 0;
+                } else if (smoothedValue > 5000) {
+                    smoothedValue = 5000;
+                }
+
+                let px = map(i, 0, maxDataPoints - 1, x + 40, x + w - 10);
+                let py = map(smoothedValue, 0, 5000, y + h - 30, y + 10);
+                vertex(px, py);
+            }
+            endShape();
+        }
+    }
+
+    // Draw current value dots for each sensor
+    let n = dataPoints.length;
+    if (n > 0) {
+        for (let i = 0; i < sensorsToPlot.length; i++) {
+            let sensorKey = sensorsToPlot[i];
+            let color = colors[sensorKey];
+            let latest = Math.max(
+                0,
+                Math.min(5000, dataPoints[n - 1][sensorKey])
+            );
+            let px = x + w - 15 - i * 20; // Offset dots horizontally
+            let py = map(latest, 0, 5000, y + h - 30, y + 10);
+
+            fill(color[0], color[1], color[2]);
+            stroke(255);
+            ellipse(px, py, 8, 8);
+
+            // Show latest value
+            noStroke();
+            fill(230);
+            textAlign(LEFT, TOP);
+            textSize(10);
+            text(latest.toFixed(1), px + 10, py - 5);
+        }
+    }
+
+    // Draw legend
+    let legendY = y + h - 15;
+    for (let i = 0; i < sensorsToPlot.length; i++) {
+        let sensorKey = sensorsToPlot[i];
+        let color = colors[sensorKey];
+        let label = portLabels[portKeys.indexOf(sensorKey)];
+
+        // Legend line
+        stroke(color[0], color[1], color[2]);
+        strokeWeight(2);
+        let legendX = x + 45 + i * 80;
+        line(legendX, legendY, legendX + 20, legendY);
+
+        // Legend text
+        noStroke();
+        fill(200);
+        textAlign(LEFT, CENTER);
+        textSize(10);
+        text(label, legendX + 25, legendY);
+    }
+}
+
+// Exponential Moving Average - more stable than simple moving average
+// a higher alpha value means more weight to the current value !
+function calculateEMA(key, data, index, alpha = 0.8) {
+    if (index === 0) {
+        return data[0][key]; // if no previous value, return the first value
+    }
+    let currentValue = data[index][key];
+    let previousEMA = data[index - 1].ema
+        ? data[index - 1].ema[key]
+        : data[index - 1][key]; // previous EMA value or previous raw value if no EMA value
+    return alpha * currentValue + (1 - alpha) * previousEMA; // averages prevEMA & currentEMA, weighting the current value more heavily (alpha > 0.5)
+}
+
+function setupEventListeners() {
+    document
+        .getElementById("clear-btn")
+        .addEventListener("click", function () {
+            dataPoints = [];
+        });
+
+    document
+        .getElementById("pause-btn")
+        .addEventListener("click", function () {
+            isPaused = !isPaused;
+            this.textContent = isPaused ? "Resume" : "Pause";
+            this.style.backgroundColor = isPaused ? "#ff9800" : "#4CAF50";
+        });
+
+    document
+        .getElementById("export-btn")
+        .addEventListener("click", function () {
+            exportData();
+        });
+}
+
+function exportData() {
+    if (dataPoints.length === 0) {
+        alert("No data to export");
+        return;
+    }
+
+    let csv =
+        "timestamp,left_1,left_2,left_3,left_4,right_1,right_2,right_3,right_4\n";
+    dataPoints.forEach((point) => {
+        csv += `${point.timestamp},${point.left_1},${point.left_2},${point.left_3},${point.left_4},${point.right_1},${point.right_2},${point.right_3},${point.right_4}\n`;
+    });
+
+    let blob = new Blob([csv], { type: "text/csv" });
+    let url = window.URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "arduino_data.csv";
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// Handle window resize
+function windowResized() {
+    // Recalculate canvas size when window is resized
+    let containerWidth = document.querySelector(".container").offsetWidth;
+    let sidePadding = 60; // Black padding on each side
+    let availableWidth = containerWidth - 2 * sidePadding;
+    let plotWidth = Math.floor(availableWidth / 4);
+    let plotHeight = 180;
+    let paddingX = 20;
+    let paddingY = 40;
+    let cols = 4;
+    let rows = 4;
+    let titleHeight = 30;
+
+    let canvasWidth = containerWidth;
+    let canvasHeight =
+        rows * plotHeight + (rows - 1) * paddingY + titleHeight;
+
+    // Always add extra height for motion plot to ensure consistent canvas size across all tabs
+    canvasHeight += plotHeight + paddingY;
+
+    resizeCanvas(canvasWidth, canvasHeight);
+}
+
+// ===== MOTION RECOGNITION FUNCTIONS =====
+
+// Global variables for motion recording
+let isRecording = false;
+let recordedMotions = [];
+let currentMotionData = [];
+let currentMotionName = "";
+let recordingStartTime = 0;
+let recordingTimer = null;
+
+function calculateAverage(sensorKey) {
+    if (dataPoints.length === 0) return 0;
+    let sum = dataPoints.reduce((acc, point) => acc + point[sensorKey], 0);
+    return sum / dataPoints.length;
+}
+
+function updateMotionTab() {
+    updateMotionDropdown();
+}
+
+function updateMotionDropdown() {
+    const dropdown = document.getElementById("motion-dropdown");
+    if (!dropdown) return;
+
+    // Clear existing options except the first one
+    dropdown.innerHTML = '<option value="">-- Select Motion --</option>';
+
+    // Add recorded motions to dropdown
+    recordedMotions.forEach((motion) => {
+        const option = document.createElement("option");
+        option.value = motion.name;
+        option.textContent = motion.name;
+        dropdown.appendChild(option);
+    });
+}
+
+function setupMotionControls() {
+    console.log("setupMotionControls() called");
+
+    const recordBtn = document.getElementById("record-btn");
+    const stopBtn = document.getElementById("stop-btn");
+    const exportBtn = document.getElementById("export-motion-btn");
+    const addBtn = document.getElementById("add-motion-btn");
+    const motionNameInput = document.getElementById("motion-name");
+    const motionDropdown = document.getElementById("motion-dropdown");
+
+    console.log("Found elements:", {
+        recordBtn: !!recordBtn,
+        stopBtn: !!stopBtn,
+        exportBtn: !!exportBtn,
+        addBtn: !!addBtn,
+        motionNameInput: !!motionNameInput,
+        motionDropdown: !!motionDropdown,
+    });
+
+    if (recordBtn) {
+        console.log("Adding click listener to record button");
+        recordBtn.addEventListener("click", function () {
+            console.log("Record button clicked!");
+            startRecording();
+        });
+    } else {
+        console.error("Record button not found!");
+    }
+    if (stopBtn) {
+        stopBtn.addEventListener("click", stopRecording);
+    }
+    if (exportBtn) {
+        exportBtn.addEventListener("click", exportMotions);
+    }
+    if (addBtn) {
+        addBtn.addEventListener("click", addMotionToDropdown);
+    }
+    if (motionDropdown) {
+        motionDropdown.addEventListener("change", function () {
+            if (this.value) {
+                motionNameInput.value = this.value;
+            }
+        });
+    }
+    if (motionNameInput) {
+        motionNameInput.addEventListener("input", function () {
+            if (this.value) {
+                motionDropdown.value = "";
+            }
+        });
+        // Allow Enter key to add motion
+        motionNameInput.addEventListener("keypress", function (e) {
+            if (e.key === "Enter") {
+                addMotionToDropdown();
+            }
+        });
+    }
+}
+
+function addMotionToDropdown() {
+    const motionName = document.getElementById("motion-name").value.trim();
+    if (!motionName) {
+        alert("Please enter a motion name first!");
+        return;
+    }
+
+    // Check if motion already exists
+    const existingMotion = recordedMotions.find(
+        (motion) => motion.name === motionName
+    );
+    if (existingMotion) {
+        alert(`Motion "${motionName}" already exists!`);
+        return;
+    }
+
+    // Add empty motion to the list (will be filled when recorded)
+    const newMotion = {
+        name: motionName,
+        data: [],
+        timestamp: new Date().toISOString(),
+        sensorCount: portKeys.length,
+    };
+
+    recordedMotions.push(newMotion);
+    updateMotionDropdown();
+
+    // Clear the input
+    document.getElementById("motion-name").value = "";
+
+    console.log(`Added motion "${motionName}" to dropdown`);
+}
+
+function startRecording() {
+    console.log("startRecording() called");
+
+    const motionName = document.getElementById("motion-name").value.trim();
+    console.log("Motion name:", motionName);
+
+    if (!motionName) {
+        alert("Please enter a motion name first!");
+        return;
+    }
+
+    isRecording = true;
+    console.log("isRecording set to true");
+    windowResized(); // Ensure canvas resizes for motion plot
+    currentMotionName = motionName;
+    currentMotionData = [];
+    recordingStartTime = Date.now();
+
+    // Update UI
+    document.getElementById("record-btn").textContent = "Recording...";
+    document.getElementById("record-btn").classList.add("recording");
+    document.getElementById("stop-btn").disabled = false;
+    document.getElementById("motion-name").disabled = true;
+    document.getElementById("motion-dropdown").disabled = true;
+
+    // Update status
+    updateRecordingStatus();
+
+    // Start timer
+    recordingTimer = setInterval(updateRecordingTime, 1000);
+
+    console.log(`Started recording motion: ${motionName}`);
+}
+
+function stopRecording() {
+    if (!isRecording) return;
+
+    isRecording = false;
+    windowResized(); // Shrink canvas back when done
+
+    // Stop timer
+    if (recordingTimer) {
+        clearInterval(recordingTimer);
+        recordingTimer = null;
+    }
+
+    // Save the recorded motion
+    if (currentMotionData.length > 0) {
+        const motion = {
+            name: currentMotionName,
+            data: [...currentMotionData],
+            timestamp: new Date().toISOString(),
+            sensorCount: portKeys.length,
+        };
+
+        recordedMotions.push(motion);
+        console.log(
+            `Recorded motion: ${currentMotionName} with ${currentMotionData.length} data points`
+        );
+        console.log("Total recorded motions:", recordedMotions.length);
+        console.log(
+            "Last recorded motion data length:",
+            recordedMotions[recordedMotions.length - 1].data.length
+        );
+    } else {
+        console.log("No motion data to save - currentMotionData is empty");
+    }
+
+    // Update UI
+    document.getElementById("record-btn").textContent = "Record";
+    document.getElementById("record-btn").classList.remove("recording");
+    document.getElementById("stop-btn").disabled = true;
+    document.getElementById("export-motion-btn").disabled = false;
+    document.getElementById("motion-name").disabled = false;
+    document.getElementById("motion-dropdown").disabled = false;
+
+    // Update status
+    updateRecordingStatus();
+
+    // Clear current recording
+    currentMotionData = [];
+    currentMotionName = "";
+}
+
+function exportMotions() {
+    if (recordedMotions.length === 0) {
+        alert("No motions recorded yet!");
+        return;
+    }
+
+    const exportData = {
+        motions: recordedMotions,
+        exportDate: new Date().toISOString(),
+        sensorKeys: portKeys,
+        sensorLabels: portLabels,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: "application/json",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "recorded_motions.json";
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    console.log(`Exported ${recordedMotions.length} motions`);
+}
+
+function updateRecordingStatus() {
+    const statusText = document.getElementById("status-text");
+    const statusDot = document.getElementById("status-dot");
+    const currentMotion = document.getElementById("current-motion");
+    const dataPoints = document.getElementById("data-points");
+
+    if (isRecording) {
+        statusText.textContent = "Recording...";
+        statusDot.className = "status-dot recording";
+        currentMotion.textContent = `Current motion: ${currentMotionName}`;
+        dataPoints.textContent = `Data points: ${currentMotionData.length}`;
+    } else {
+        statusText.textContent = "Ready to record";
+        statusDot.className = "status-dot ready";
+        currentMotion.textContent = "No motion selected";
+        dataPoints.textContent = "Data points: 0";
+    }
+}
+
+function updateRecordingTime() {
+    if (!isRecording) return;
+
+    const recordingTime = document.getElementById("recording-time");
+    const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+    recordingTime.textContent = `Time: ${elapsed}s`;
+}
+
+// ===== MOTION TAB DRAWING FUNCTION =====
+
+function drawMotionTab() {
+    console.log("drawMotionTab() called");
+
+    // Calculate dynamic sizes to match setup() with side padding
+    let containerWidth = document.querySelector(".container").offsetWidth;
+    let sidePadding = 60; // Black padding on each side
+    let availableWidth = containerWidth - 2 * sidePadding;
+    let plotWidth = Math.floor(availableWidth / 4);
+    let plotHeight = 360;
+    let paddingX = 20;
+    let paddingY = 40;
+
+    // Calculate the total width of all plots in a row and center them
+    let totalPlotWidth = 4 * plotWidth + 3 * paddingX;
+    let startX = sidePadding + (availableWidth - totalPlotWidth) / 2; // Center the plots
+
+    console.log("Motion tab dimensions:", {
+        startX,
+        totalPlotWidth,
+        plotHeight,
+    });
+
+    // Draw row title for motion data
+    fill(255);
+    noStroke();
+    textAlign(CENTER, TOP);
+    textSize(16);
+    textStyle(BOLD);
+    text("Motion Data", startX + totalPlotWidth / 2, paddingY - 25);
+    textStyle(NORMAL);
+
+    // Show current motion data if recording and has data, otherwise show last recorded motion
+    let dataToShow = [];
+    if (isRecording && currentMotionData.length > 0) {
+        dataToShow = currentMotionData;
+    } else if (recordedMotions.length > 0) {
+        dataToShow = recordedMotions[recordedMotions.length - 1].data;
+    }
+
+    console.log("Motion data to show:", {
+        isRecording,
+        currentMotionDataLength: currentMotionData.length,
+        recordedMotionsLength: recordedMotions.length,
+        dataToShowLength: dataToShow.length,
+    });
+
+    if (dataToShow.length > 0) {
+        console.log(
+            "Drawing motion data plot with",
+            dataToShow.length,
+            "data points"
+        );
+
+        // Temporarily replace dataPoints with motion data for plotting
+        let originalDataPoints = dataPoints;
+        dataPoints = dataToShow;
+
+        // Draw motion data plot using existing function
+        drawCombinedPlot(
+            startX,
+            paddingY,
+            totalPlotWidth,
+            plotHeight,
+            "all",
+            "Motion Data"
+        );
+
+        // Restore original dataPoints
+        dataPoints = originalDataPoints;
+
+        // Show recording status on the plot
+        if (isRecording) {
+            fill(255, 255, 0);
+            textAlign(LEFT, TOP);
+            textSize(14);
+            text("RECORDING...", startX + 10, paddingY + 10);
+        }
+    } else {
+        console.log("Drawing empty motion plot");
+
+        // Draw empty motion plot
+        drawCombinedPlot(
+            startX,
+            paddingY,
+            totalPlotWidth,
+            plotHeight,
+            "all",
+            "Motion Data"
+        );
+
+        // Show instruction text
+        fill(150);
+        textAlign(CENTER, CENTER);
+        textSize(14);
+        text(
+            "Start recording to see motion data here",
+            startX + totalPlotWidth / 2,
+            paddingY + plotHeight / 2
+        );
+    }
+}
+
+// ===== END MOTION RECOGNITION FUNCTIONS =====
+
+// Handle Arduino data
+socket.on("arduino_data", function (data) {
+    if (!isPaused) {
+        handleNewData(data);
+    }
+});
+
+socket.on("server_status", function (data) {
+    console.log("Server status:", data.message);
+});
+{% endblock %}

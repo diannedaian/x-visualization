@@ -42,7 +42,7 @@ class ArduinoDataReader:
             for port in ports:
                 if 'arduino' in port.name.lower() or 'usb' in port.name.lower():
                     arduino_ports.append(port.device)
-            
+
             if arduino_ports:
                 self.port = arduino_ports[0]
                 logger.info(f"Auto-detected Arduino port: {self.port}")
@@ -90,14 +90,14 @@ class ArduinoDataReader:
             # Pad with zeros if not enough data
             while len(data) < 8:
                 data.append('0')
-            
+
             # Convert to float, defaulting to 0 if conversion fails
             def safe_float(value):
                 try:
                     return float(value.strip()) if value.strip() else 0
                 except:
                     return 0
-            
+
             parsed_data = {
                 'timestamp': time.time(),
                 'raw': raw_data,
@@ -201,16 +201,54 @@ def index():
     <head>
         <title>Arduino Data Stream</title>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
     </head>
     <body>
         <h1>Arduino Data Stream</h1>
         <div id="status">Connecting...</div>
         <div id="data-display"></div>
-
+        <div id="overlay-graph-container" style="margin-bottom: 40px;"></div>
         <script>
             const socket = io();
             const statusDiv = document.getElementById('status');
             const dataDiv = document.getElementById('data-display');
+
+            // Data for plotting
+            window.dataPoints = [];
+            let isPaused = false;
+            let maxDataPoints = 50;
+
+            // Port colors and labels
+            const colors = {
+                left_1: [255, 107, 107], // Red
+                left_2: [255, 159, 67], // Orange
+                left_3: [255, 221, 89], // Yellow
+                left_4: [38, 222, 129], // Green
+                right_1: [78, 205, 196], // Teal
+                right_2: [69, 183, 209], // Blue
+                right_3: [75, 123, 236], // Indigo
+                right_4: [165, 94, 234], // Purple
+            };
+            const portLabels = [
+                "Left 1",
+                "Left 2",
+                "Left 3",
+                "Left 4",
+                "Right 1",
+                "Right 2",
+                "Right 3",
+                "Right 4",
+            ];
+            const portKeys = [
+                "left_1",
+                "left_2",
+                "left_3",
+                "left_4",
+                "right_1",
+                "right_2",
+                "right_3",
+                "right_4",
+            ];
 
             socket.on('connect', function() {
                 statusDiv.innerHTML = 'Connected to server';
@@ -223,14 +261,24 @@ def index():
             });
 
             socket.on('arduino_data', function(data) {
-                console.log('Received data:', data);
+                if (!isPaused) {
+                    window.dataPoints.push(data);
+                    if (window.dataPoints.length > maxDataPoints) {
+                        window.dataPoints.shift();
+                    }
+                }
+                // Display latest data
                 dataDiv.innerHTML = `
                     <p><strong>Data Point #${data.data_count}</strong></p>
                     <p>Timestamp: ${new Date(data.timestamp * 1000).toLocaleTimeString()}</p>
-                    <p>Far Left: ${data.far_left}</p>
-                    <p>Top Left: ${data.top_left}</p>
-                    <p>Top Right: ${data.top_right}</p>
-                    <p>Far Right: ${data.far_right}</p>
+                    <p>Left 1: ${data.left_1}</p>
+                    <p>Left 2: ${data.left_2}</p>
+                    <p>Left 3: ${data.left_3}</p>
+                    <p>Left 4: ${data.left_4}</p>
+                    <p>Right 1: ${data.right_1}</p>
+                    <p>Right 2: ${data.right_2}</p>
+                    <p>Right 3: ${data.right_3}</p>
+                    <p>Right 4: ${data.right_4}</p>
                     <p>Raw: ${data.raw}</p>
                     <hr>
                 `;
@@ -239,6 +287,138 @@ def index():
             socket.on('server_status', function(data) {
                 statusDiv.innerHTML = `Server Status: ${data.message}`;
             });
+        </script>
+        <script>
+        // Overlay plot for all 8 ports
+        new p5(function (p) {
+            let overlayWidth = 1000;
+            let overlayHeight = 300;
+            let overlayGraphX = 60;
+            let overlayGraphY = 40;
+            let overlayGraphWidth = overlayWidth - 80;
+            let overlayGraphHeight = overlayHeight - 80;
+
+            p.setup = function () {
+                let c = p.createCanvas(overlayWidth, overlayHeight);
+                c.parent('overlay-graph-container');
+            };
+
+            p.draw = function () {
+                p.background(26, 26, 26);
+
+                // Draw background
+                p.fill(40, 40, 40);
+                p.noStroke();
+                p.rect(overlayGraphX, overlayGraphY, overlayGraphWidth, overlayGraphHeight);
+
+                // Draw grid
+                p.stroke(60, 60, 60);
+                p.strokeWeight(1);
+                for (let i = 0; i <= 10; i++) {
+                    let y = overlayGraphY + (i * overlayGraphHeight / 10);
+                    p.line(overlayGraphX, y, overlayGraphX + overlayGraphWidth, y);
+                }
+                for (let i = 0; i <= 10; i++) {
+                    let x = overlayGraphX + (i * overlayGraphWidth / 10);
+                    p.line(x, overlayGraphY, x, overlayGraphY + overlayGraphHeight);
+                }
+
+                // Draw axes
+                p.stroke(200);
+                p.strokeWeight(2);
+                p.line(overlayGraphX, overlayGraphY, overlayGraphX, overlayGraphY + overlayGraphHeight);
+                p.line(overlayGraphX, overlayGraphY + overlayGraphHeight, overlayGraphX + overlayGraphWidth, overlayGraphY + overlayGraphHeight);
+
+                // Y-axis labels
+                p.fill(200);
+                p.noStroke();
+                p.textAlign(p.RIGHT, p.CENTER);
+                p.textSize(12);
+                let minY = 0, maxY = 5000;
+                if (window.dataPoints && window.dataPoints.length > 1) {
+                    minY = Infinity; maxY = -Infinity;
+                    window.dataPoints.forEach(point => {
+                        for (let key of portKeys) {
+                            minY = Math.min(minY, point[key]);
+                            maxY = Math.max(maxY, point[key]);
+                        }
+                    });
+                    let padding = (maxY - minY) * 0.1;
+                    minY -= padding;
+                    maxY += padding;
+                    if (maxY - minY < 10) {
+                        let center = (maxY + minY) / 2;
+                        minY = center - 5;
+                        maxY = center + 5;
+                    }
+                }
+                for (let i = 0; i <= 5; i++) {
+                    let y = overlayGraphY + (i * overlayGraphHeight / 5);
+                    let value = window.dataPoints && window.dataPoints.length > 1
+                        ? p.map(i, 0, 5, maxY, minY)
+                        : 0;
+                    p.text(value.toFixed(0), overlayGraphX - 10, y);
+                }
+                // X-axis label
+                p.textAlign(p.CENTER, p.TOP);
+                p.text('Time →', overlayGraphX + overlayGraphWidth / 2, overlayGraphY + overlayGraphHeight + 20);
+
+                // Legend
+                let legendX = overlayGraphX + 20;
+                let legendY = overlayGraphY - 30;
+                for (let i = 0; i < portKeys.length; i++) {
+                    let key = portKeys[i];
+                    let color = colors[key];
+                    p.fill(color[0], color[1], color[2]);
+                    p.noStroke();
+                    p.rect(legendX + i * 110, legendY, 20, 6, 2);
+                    p.fill(220);
+                    p.textAlign(p.LEFT, p.CENTER);
+                    p.textSize(12);
+                    p.text(portLabels[i], legendX + i * 110 + 25, legendY + 3);
+                }
+
+                // Draw all 8 signals if data exists
+                if (window.dataPoints && window.dataPoints.length > 1) {
+                    let minY = Infinity, maxY = -Infinity;
+                    window.dataPoints.forEach(point => {
+                        for (let key of portKeys) {
+                            minY = Math.min(minY, point[key]);
+                            maxY = Math.max(maxY, point[key]);
+                        }
+                    });
+                    let padding = (maxY - minY) * 0.1;
+                    minY -= padding;
+                    maxY += padding;
+                    if (maxY - minY < 10) {
+                        let center = (maxY + minY) / 2;
+                        minY = center - 5;
+                        maxY = center + 5;
+                    }
+
+                    for (let i = 0; i < portKeys.length; i++) {
+                        let key = portKeys[i];
+                        let color = colors[key];
+                        p.stroke(color[0], color[1], color[2]);
+                        p.strokeWeight(2);
+                        p.noFill();
+                        p.beginShape();
+                        for (let j = 0; j < window.dataPoints.length; j++) {
+                            let x = p.map(j, 0, maxDataPoints - 1, overlayGraphX, overlayGraphX + overlayGraphWidth);
+                            let y = p.map(window.dataPoints[j][key], minY, maxY, overlayGraphY + overlayGraphHeight, overlayGraphY);
+                            p.vertex(x, y);
+                        }
+                        p.endShape();
+                    }
+                } else {
+                    // No data: show placeholder message
+                    p.fill(180);
+                    p.textAlign(p.CENTER, p.CENTER);
+                    p.textSize(20);
+                    p.text('No data yet', overlayGraphX + overlayGraphWidth / 2, overlayGraphY + overlayGraphHeight / 2);
+                }
+            };
+        });
         </script>
     </body>
     </html>
@@ -279,7 +459,7 @@ if __name__ == '__main__':
         data_reader.start()
 
         # Start the Flask-SocketIO server
-        socketio.run(app, debug=True, host='0.0.0.0', port=5002)
+        socketio.run(app, debug=True, host='0.0.0.0', port=5000)
 
     except KeyboardInterrupt:
         logger.info("Shutting down...")
