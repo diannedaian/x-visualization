@@ -462,6 +462,7 @@ function draw() {
     drawMotionTab();
 }
 
+// Updated drawCombinedPlot function for the recording page
 function drawCombinedPlot(x, y, w, h, sensorGroup, label, plotData) {
     // Draw background
     fill(40, 40, 40);
@@ -516,51 +517,47 @@ function drawCombinedPlot(x, y, w, h, sensorGroup, label, plotData) {
         ];
     }
 
-    // Draw data lines for each sensor
-    if (dataPoints.length > 1) {
+    // **KEY CHANGE**: Use the passed plotData instead of global dataPoints
+    let dataToPlot = plotData || []; // Use empty array if no data provided
+
+    // Draw data lines for each sensor (only if we have data)
+    if (dataToPlot.length > 1) {
         for (let sensorKey of sensorsToPlot) {
             let color = colors[sensorKey];
 
-            // Plot the smoothed data
+            // Plot the data (use raw values for motion data since EMA might not be calculated)
             stroke(color[0], color[1], color[2]);
             strokeWeight(2);
             noFill();
             beginShape();
-            for (let i = 0, n = dataPoints.length; i < n; i++) {
-                let smoothedValue;
-                if (
-                    dataPoints[i].ema &&
-                    dataPoints[i].ema[sensorKey] !== undefined
-                ) {
-                    smoothedValue = dataPoints[i].ema[sensorKey];
-                } else {
-                    // Fallback to raw value if EMA doesn't exist
-                    smoothedValue = dataPoints[i][sensorKey];
+            for (let i = 0, n = dataToPlot.length; i < n; i++) {
+                let value = dataToPlot[i][sensorKey];
+
+                // Clamp value to display range
+                if (value < 0) {
+                    value = 0;
+                } else if (value > 5000) {
+                    value = 5000;
                 }
 
-                if (smoothedValue < 0) {
-                    smoothedValue = 0;
-                } else if (smoothedValue > 5000) {
-                    smoothedValue = 5000;
-                }
-
-                let px = map(i, 0, maxDataPoints - 1, x + 40, x + w - 10);
-                let py = map(smoothedValue, 0, 5000, y + h - 30, y + 10);
+                // For motion data, map based on data length instead of maxDataPoints
+                let px = map(i, 0, Math.max(1, n - 1), x + 40, x + w - 10);
+                let py = map(value, 0, 5000, y + h - 30, y + 10);
                 vertex(px, py);
             }
             endShape();
         }
     }
 
-    // Draw current value dots for each sensor
-    let n = dataPoints.length;
+    // Draw current value dots for each sensor (only if we have data)
+    let n = dataToPlot.length;
     if (n > 0) {
         for (let i = 0; i < sensorsToPlot.length; i++) {
             let sensorKey = sensorsToPlot[i];
             let color = colors[sensorKey];
             let latest = Math.max(
                 0,
-                Math.min(5000, dataPoints[n - 1][sensorKey])
+                Math.min(5000, dataToPlot[n - 1][sensorKey])
             );
             let px = x + w - 15 - i * 20; // Offset dots horizontally
             let py = map(latest, 0, 5000, y + h - 30, y + 10);
