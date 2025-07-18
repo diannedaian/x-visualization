@@ -462,7 +462,7 @@ function draw() {
     drawMotionTab();
 }
 
-function drawCombinedPlot(x, y, w, h, sensorGroup, label) {
+function drawCombinedPlot(x, y, w, h, sensorGroup, label, plotData) {
     // Draw background
     fill(40, 40, 40);
     stroke(80);
@@ -978,63 +978,42 @@ function drawMotionTab() {
     text("Motion Data", startX + totalPlotWidth / 2, paddingY - 25);
     textStyle(NORMAL);
 
-    // Show current motion data if recording and has data, otherwise show last recorded motion
-    let dataToShow = [];
+    // Only plot if recording and there is data
     if (isRecording && currentMotionData.length > 0) {
-        dataToShow = currentMotionData;
-    } else if (recordedMotions.length > 0) {
-        dataToShow = recordedMotions[recordedMotions.length - 1].data;
-    }
-
-    console.log("Motion data to show:", {
-        isRecording,
-        currentMotionDataLength: currentMotionData.length,
-        recordedMotionsLength: recordedMotions.length,
-        dataToShowLength: dataToShow.length,
-    });
-
-    if (dataToShow.length > 0) {
         console.log(
             "Drawing motion data plot with",
-            dataToShow.length,
+            currentMotionData.length,
             "data points"
         );
 
-        // Temporarily replace dataPoints with motion data for plotting
-        let originalDataPoints = dataPoints;
-        dataPoints = dataToShow;
-
-        // Draw motion data plot using existing function
+        // Draw motion data plot using currentMotionData
         drawCombinedPlot(
             startX,
             paddingY,
             totalPlotWidth,
             plotHeight,
             "all",
-            "Motion Data"
+            "Motion Data",
+            currentMotionData // <--- pass as argument
         );
 
-        // Restore original dataPoints
-        dataPoints = originalDataPoints;
-
         // Show recording status on the plot
-        if (isRecording) {
-            fill(255, 255, 0);
-            textAlign(LEFT, TOP);
-            textSize(14);
-            text("RECORDING...", startX + 10, paddingY + 10);
-        }
+        fill(255, 255, 0);
+        textAlign(LEFT, TOP);
+        textSize(14);
+        text("RECORDING...", startX + 10, paddingY + 10);
     } else {
         console.log("Drawing empty motion plot");
 
-        // Draw empty motion plot
+        // Draw empty motion plot (no data)
         drawCombinedPlot(
             startX,
             paddingY,
             totalPlotWidth,
             plotHeight,
             "all",
-            "Motion Data"
+            "Motion Data",
+            [] // <--- pass empty array
         );
 
         // Show instruction text
@@ -1048,7 +1027,6 @@ function drawMotionTab() {
         );
     }
 }
-
 // ===== END MOTION RECOGNITION FUNCTIONS =====
 
 // Handle Arduino data

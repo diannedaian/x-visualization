@@ -149,7 +149,7 @@ function handleNewData(data) {
     for (let key of portKeys) {
         data.ema[key] = calculateEMA(
             key,
-            dataPoints,                 // ← This is the array WITHOUT the new data point
+            dataPoints,
             dataPoints.length - 1
         );
     }
