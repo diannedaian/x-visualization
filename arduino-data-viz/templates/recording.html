@@ -205,13 +205,13 @@
             <div id="instructions" style="text-align: left">
                 <p>1. Add motion name or select an existing motion</p>
                 <p>2. Press the "Record" button</p>
-                <p>3. Move your model in the desired motion</p>
+                <p>3. Get ready during the 3-second countdown</p>
+                <p>4. Move your model in the desired motion</p>
                 <p>
-                    4. If it's the first trial, press the "Stop" button to
-                    establish the motion's duration
+                    5. Press the "Stop" button to end recording
                 </p>
                 <p>
-                    5. After all trials, press the "Export" button to save the
+                    6. After all trials, press the "Export" button to save the
                     motion data
                 </p>
             </div>
@@ -277,6 +277,11 @@ let graphWidth, graphHeight;
 let graphX, graphY;
 let minY = 0, maxY = 1024; // Arduino analog range
 let autoScale = true;
+
+// Countdown variables
+let isCountingDown = false;
+let countdownValue = 0;
+let countdownInterval = null;
 
 // Colors for each data stream
 const colors = {
@@ -360,7 +365,7 @@ function handleNewData(data) {
     for (let key of portKeys) {
         data.ema[key] = calculateEMA(
             key,
-            dataPoints,                 // ← This is the array WITHOUT the new data point
+            dataPoints,
             dataPoints.length - 1
         );
     }
@@ -368,14 +373,8 @@ function handleNewData(data) {
     // Update motion tab if it's active
     updateMotionTab();
 
-    // Record motion data if recording
-    console.log(
-        "handleNewData called, isRecording:",
-        isRecording,
-        "dataPoints length:",
-        dataPoints.length
-    );
-    if (isRecording) {
+    // Record motion data ONLY if actually recording (not during countdown)
+    if (isRecording && !isCountingDown) {
         currentMotionData.push({
             timestamp: data.timestamp,
             left_1: data.left_1,
@@ -387,26 +386,11 @@ function handleNewData(data) {
             right_3: data.right_3,
             right_4: data.right_4,
         });
-        console.log(
-            `Recording motion data point ${currentMotionData.length}:`,
-            data
-        );
 
         // Update data points count in real-time
         const dataPointsEl = document.getElementById("data-points");
         if (dataPointsEl) {
             dataPointsEl.textContent = `Data points: ${currentMotionData.length}`;
-        }
-    } else {
-        // Only log occasionally to avoid spam
-        if (Math.random() < 0.01) {
-            // 1% chance to log
-            console.log(
-                "handleNewData called, isRecording:",
-                isRecording,
-                "dataPoints length:",
-                dataPoints.length
-            );
         }
     }
 }
@@ -694,12 +678,16 @@ function calculateAverage(sensorKey) {
 }
 
 function updateMotionTab() {
-    updateMotionDropdown();
+    // Don't constantly rebuild dropdown - causes glitching
+    // Only update when motions are actually added/removed
 }
 
 function updateMotionDropdown() {
     const dropdown = document.getElementById("motion-dropdown");
     if (!dropdown) return;
+
+    // Store the current selected value to preserve it
+    const currentValue = dropdown.value;
 
     // Clear existing options except the first one
     dropdown.innerHTML = '<option value="">-- Select Motion --</option>';
@@ -711,6 +699,11 @@ function updateMotionDropdown() {
         option.textContent = motion.name;
         dropdown.appendChild(option);
     });
+
+    // Restore the selected value if it still exists
+    if (currentValue && recordedMotions.find(motion => motion.name === currentValue)) {
+        dropdown.value = currentValue;
+    }
 }
 
 function setupMotionControls() {
@@ -816,30 +809,81 @@ function startRecording() {
         return;
     }
 
-    isRecording = true;
-    console.log("isRecording set to true");
-    windowResized(); // Ensure canvas resizes for motion plot
+    // Start countdown phase
+    isCountingDown = true;
+    countdownValue = 3;
     currentMotionName = motionName;
     currentMotionData = [];
-    recordingStartTime = Date.now();
 
-    // Update UI
-    document.getElementById("record-btn").textContent = "Recording...";
+    // Update UI for countdown
+    document.getElementById("record-btn").textContent = "Get Ready...";
     document.getElementById("record-btn").classList.add("recording");
-    document.getElementById("stop-btn").disabled = false;
+    document.getElementById("stop-btn").disabled = true; // Keep disabled during countdown
     document.getElementById("motion-name").disabled = true;
     document.getElementById("motion-dropdown").disabled = true;
 
-    // Update status
+    // Update status for countdown
+    updateRecordingStatusForCountdown();
+
+    // Start countdown timer
+    countdownInterval = setInterval(() => {
+        countdownValue--;
+        updateRecordingStatusForCountdown();
+
+        if (countdownValue <= 0) {
+            // Countdown finished, start actual recording
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+            isCountingDown = false;
+
+            // Now start the actual recording
+            startActualRecording();
+        }
+    }, 1000);
+
+    console.log(`Starting countdown for motion: ${motionName}`);
+}
+
+function startActualRecording() {
+    isRecording = true;
+    recordingStartTime = Date.now();
+
+    // Update UI for recording
+    document.getElementById("record-btn").textContent = "Recording...";
+    document.getElementById("stop-btn").disabled = false;
+
+    // Update status for recording
     updateRecordingStatus();
 
-    // Start timer
+    // Start recording timer
     recordingTimer = setInterval(updateRecordingTime, 1000);
 
-    console.log(`Started recording motion: ${motionName}`);
+    console.log(`Countdown finished - now recording motion: ${currentMotionName}`);
 }
 
 function stopRecording() {
+    // If countdown is active, cancel it
+    if (isCountingDown) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        isCountingDown = false;
+        countdownValue = 0;
+
+        // Reset UI
+        document.getElementById("record-btn").textContent = "Record";
+        document.getElementById("record-btn").classList.remove("recording");
+        document.getElementById("stop-btn").disabled = true;
+        document.getElementById("motion-name").disabled = false;
+        document.getElementById("motion-dropdown").disabled = false;
+
+        updateRecordingStatus();
+
+        // Clear current recording data
+        currentMotionData = [];
+        currentMotionName = "";
+        return;
+    }
+
     if (!isRecording) return;
 
     isRecording = false;
@@ -861,6 +905,8 @@ function stopRecording() {
         };
 
         recordedMotions.push(motion);
+        updateMotionDropdown(); // Update dropdown since we added new motion
+
         console.log(
             `Recorded motion: ${currentMotionName} with ${currentMotionData.length} data points`
         );
@@ -913,6 +959,20 @@ function exportMotions() {
     window.URL.revokeObjectURL(url);
 
     console.log(`Exported ${recordedMotions.length} motions`);
+}
+
+function updateRecordingStatusForCountdown() {
+    const statusText = document.getElementById("status-text");
+    const statusDot = document.getElementById("status-dot");
+    const currentMotion = document.getElementById("current-motion");
+    const dataPoints = document.getElementById("data-points");
+
+    if (isCountingDown) {
+        statusText.textContent = `Get ready... ${countdownValue}`;
+        statusDot.className = "status-dot recording"; // Use recording animation
+        currentMotion.textContent = `Preparing: ${currentMotionName}`;
+        dataPoints.textContent = "Data points: 0";
+    }
 }
 
 function updateRecordingStatus() {
@@ -975,7 +1035,37 @@ function drawMotionTab() {
     text("Motion Data", startX + totalPlotWidth / 2, paddingY - 25);
     textStyle(NORMAL);
 
-    // Only plot if recording and there is data
+    // Show countdown if counting down
+    if (isCountingDown) {
+        console.log("Drawing countdown:", countdownValue);
+
+        // Draw empty plot background
+        drawCombinedPlot(
+            startX,
+            paddingY,
+            totalPlotWidth,
+            plotHeight,
+            "all",
+            "Motion Data",
+            [] // Empty array - no data during countdown
+        );
+
+        // Draw large countdown number
+        fill(255, 255, 0);
+        textAlign(CENTER, CENTER);
+        textSize(120);
+        textStyle(BOLD);
+        text(countdownValue, startX + totalPlotWidth / 2, paddingY + plotHeight / 2);
+
+        // Draw "Get Ready" text
+        textSize(24);
+        text("Get Ready!", startX + totalPlotWidth / 2, paddingY + plotHeight / 2 - 80);
+        textStyle(NORMAL);
+
+        return; // Exit early during countdown
+    }
+
+    // Only plot if recording and there is data (after countdown)
     if (isRecording && currentMotionData.length > 0) {
         console.log(
             "Drawing motion data plot with",
@@ -991,7 +1081,7 @@ function drawMotionTab() {
             plotHeight,
             "all",
             "Motion Data",
-            currentMotionData // <--- pass as argument
+            currentMotionData
         );
 
         // Show recording status on the plot
@@ -1010,7 +1100,7 @@ function drawMotionTab() {
             plotHeight,
             "all",
             "Motion Data",
-            [] // <--- pass empty array
+            []
         );
 
         // Show instruction text
