@@ -1,0 +1,159 @@
+{
+  "sessionInfo": {
+    "totalMotions": 1,
+    "trialsPerMotion": 2,
+    "recordingDurationSeconds": 1,
+    "totalRecordings": 2,
+    "completedAt": "2025-07-21T20:19:17.726Z"
+  },
+  "motions": [
+    {
+      "motionNumber": 1,
+      "trial": 2,
+      "data": [
+        {
+          "timestamp": 1753129150.7472498,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 0,
+          "right_2": 0,
+          "right_3": 0,
+          "right_4": 0
+        },
+        {
+          "timestamp": 1753129150.947971,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 0,
+          "right_2": 0,
+          "right_3": 0,
+          "right_4": 0
+        },
+        {
+          "timestamp": 1753129151.1473331,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 0,
+          "right_2": 0,
+          "right_3": 0,
+          "right_4": 0
+        },
+        {
+          "timestamp": 1753129151.347472,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 0,
+          "right_2": 0,
+          "right_3": 0,
+          "right_4": 0
+        },
+        {
+          "timestamp": 1753129151.5472698,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 0,
+          "right_2": 0,
+          "right_3": 0,
+          "right_4": 0
+        }
+      ],
+      "timestamp": "2025-07-21T20:19:11.722Z",
+      "duration": 1000,
+      "sensorCount": 8
+    },
+    {
+      "motionNumber": 1,
+      "trial": 1,
+      "data": [
+        {
+          "timestamp": 1753129156.748426,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 3464,
+          "right_2": 3553,
+          "right_3": 3521,
+          "right_4": 3583
+        },
+        {
+          "timestamp": 1753129156.94848,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 3484,
+          "right_2": 3525,
+          "right_3": 3517,
+          "right_4": 3536
+        },
+        {
+          "timestamp": 1753129157.148486,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 3610,
+          "right_2": 3607,
+          "right_3": 3609,
+          "right_4": 3632
+        },
+        {
+          "timestamp": 1753129157.3484302,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 3632,
+          "right_2": 3634,
+          "right_3": 3625,
+          "right_4": 3648
+        },
+        {
+          "timestamp": 1753129157.548355,
+          "left_1": 0,
+          "left_2": 0,
+          "left_3": 0,
+          "left_4": 0,
+          "right_1": 3726,
+          "right_2": 3714,
+          "right_3": 3707,
+          "right_4": 3727
+        }
+      ],
+      "timestamp": "2025-07-21T20:19:17.725Z",
+      "duration": 1000,
+      "sensorCount": 8
+    }
+  ],
+  "sensorKeys": [
+    "left_1",
+    "left_2",
+    "left_3",
+    "left_4",
+    "right_1",
+    "right_2",
+    "right_3",
+    "right_4"
+  ],
+  "sensorLabels": [
+    "Left 1",
+    "Left 2",
+    "Left 3",
+    "Left 4",
+    "Right 1",
+    "Right 2",
+    "Right 3",
+    "Right 4"
+  ]
+}

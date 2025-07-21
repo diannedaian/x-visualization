@@ -221,12 +221,14 @@
             <h3>Instructions</h3>
             <div id="instructions" style="text-align: left">
                 <p>1. Enter the number of different motions you want to record</p>
-                <p>2. Press "Setup Recording" to prepare the session</p>
-                <p>3. Press "Start Recording" to begin the automated process</p>
-                <p>4. Follow the countdown and motion number prompts</p>
-                <p>5. Perform the indicated motion during the 5-second recording</p>
-                <p>6. Repeat until all motions are recorded 3 times each</p>
-                <p>7. Data will be automatically saved to the "recorded_motions" folder</p>
+                <p>2. Set how many times each motion should be recorded (trials)</p>
+                <p>3. Set the recording duration for each motion (1-30 seconds)</p>
+                <p>4. Press "Setup Recording" to prepare the session</p>
+                <p>5. Press "Start Recording" to begin the automated process</p>
+                <p>6. Follow the countdown and motion number prompts</p>
+                <p>7. Perform the indicated motion during the recording period</p>
+                <p>8. Repeat until all motions are recorded the specified number of times</p>
+                <p>9. Data will be automatically saved to the "recorded_motions" folder</p>
             </div>
         </div>
 
@@ -244,6 +246,35 @@
                             value="3"
                             placeholder="e.g., 3"
                         />
+                    </div>
+                </div>
+
+                <div class="motion-input-group">
+                    <label for="trials-per-motion">Trials per Motion:</label>
+                    <div class="input-with-button">
+                        <input
+                            type="number"
+                            id="trials-per-motion"
+                            min="1"
+                            max="20"
+                            value="3"
+                            placeholder="e.g., 3"
+                        />
+                    </div>
+                </div>
+
+                <div class="motion-input-group">
+                    <label for="recording-duration">Recording Duration (seconds):</label>
+                    <div class="input-with-button">
+                        <input
+                            type="number"
+                            id="recording-duration"
+                            min="1"
+                            max="30"
+                            value="5"
+                            step="0.5"
+                            placeholder="e.g., 5"
+                        />
                         <button id="setup-btn" class="setup-btn">Setup Recording</button>
                     </div>
                 </div>
@@ -256,7 +287,7 @@
 
                 <div id="progress-section" class="progress-section" style="display: none;">
                     <h4>Recording Progress</h4>
-                    <p id="progress-summary">Motion 1 of 3 - Trial 1 of 3</p>
+                    <p id="progress-summary">Preparing session...</p>
                     <div id="progress-grid" class="progress-grid"></div>
                 </div>
             </div>
@@ -395,13 +426,50 @@ function setupNewRecordingSystem() {
             }
         });
     }
+
+    const recordingDurationInput = document.getElementById("recording-duration");
+    if (recordingDurationInput) {
+        recordingDurationInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                setupRecordingSession();
+            }
+        });
+    }
+
+    const trialsPerMotionInput = document.getElementById("trials-per-motion");
+    if (trialsPerMotionInput) {
+        trialsPerMotionInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                setupRecordingSession();
+            }
+        });
+    }
 }
 
 function setupRecordingSession() {
     const motionCount = parseInt(document.getElementById("motion-count").value);
+    const trialsPerMotion = parseInt(document.getElementById("trials-per-motion").value);
+    const recordingDuration = parseFloat(document.getElementById("recording-duration").value);
 
     if (!motionCount || motionCount < 1 || motionCount > 10) {
         alert("Please enter a valid number of motions (1-10)");
+        return;
+    }
+
+    if (!trialsPerMotion || trialsPerMotion < 1 || trialsPerMotion > 20) {
+        alert("Please enter a valid number of trials per motion (1-20)");
+        return;
+    }
+
+    if (!recordingDuration || recordingDuration < 1 || recordingDuration > 30) {
+        alert("Please enter a valid recording duration (1-30 seconds)");
+        return;
+    }
+
+    // Calculate total recordings
+    const totalRecordings = motionCount * trialsPerMotion;
+    if (totalRecordings > 200) {
+        alert(`Too many total recordings (${totalRecordings}). Please reduce motions or trials per motion.`);
         return;
     }
 
@@ -410,22 +478,28 @@ function setupRecordingSession() {
         ...recordingSession,
         isSetup: true,
         totalMotions: motionCount,
+        trialsPerMotion: trialsPerMotion,
         currentMotion: 1,
         currentTrial: 1,
         currentSequenceIndex: 0,
         recordedData: [],
         isRecording: false,
         isCountingDown: false,
+        recordingDuration: recordingDuration * 1000, // Convert to milliseconds
     };
 
-    // Generate randomized sequence (each motion 3 times)
-    recordingSession.motionSequence = generateMotionSequence(motionCount);
+    // Generate randomized sequence (each motion appears trialsPerMotion times)
+    recordingSession.motionSequence = generateMotionSequence(motionCount, trialsPerMotion);
 
     console.log("Generated sequence:", recordingSession.motionSequence);
+    console.log(`Recording duration set to: ${recordingDuration} seconds`);
+    console.log(`Total recordings: ${totalRecordings} (${motionCount} motions × ${trialsPerMotion} trials)`);
 
     // Update UI
     document.getElementById("setup-btn").disabled = true;
     document.getElementById("motion-count").disabled = true;
+    document.getElementById("trials-per-motion").disabled = true;
+    document.getElementById("recording-duration").disabled = true;
     document.getElementById("start-recording-btn").disabled = false;
     document.getElementById("reset-btn").disabled = false;
 
@@ -434,15 +508,15 @@ function setupRecordingSession() {
     updateProgressDisplay();
     updateRecordingStatus();
 
-    console.log(`Setup complete: ${motionCount} motions, ${motionCount * 3} total recordings`);
+    console.log(`Setup complete: ${motionCount} motions, ${trialsPerMotion} trials each, ${recordingDuration}s duration, ${totalRecordings} total recordings`);
 }
 
-function generateMotionSequence(motionCount) {
+function generateMotionSequence(motionCount, trialsPerMotion) {
     let sequence = [];
 
-    // Create array with each motion number appearing 3 times
+    // Create array with each motion number appearing trialsPerMotion times
     for (let motion = 1; motion <= motionCount; motion++) {
-        for (let trial = 1; trial <= 3; trial++) {
+        for (let trial = 1; trial <= trialsPerMotion; trial++) {
             sequence.push({ motionNumber: motion, trial: trial });
         }
     }
@@ -518,7 +592,7 @@ function startActualRecording() {
         stopCurrentRecording();
     }, recordingSession.recordingDuration);
 
-    console.log(`Recording Motion ${recordingSession.currentMotion} for 5 seconds...`);
+    console.log(`Recording Motion ${recordingSession.currentMotion} for ${recordingSession.recordingDuration/1000} seconds...`);
 }
 
 function stopCurrentRecording() {
@@ -558,8 +632,8 @@ function stopCurrentRecording() {
         completeRecordingSession();
     } else {
         // Prepare for next recording with a short break
-        updateRecordingStatus();
         updateProgressDisplay();
+        updateRecordingStatus();
 
         setTimeout(() => {
             if (recordingSession.isSetup && recordingSession.currentSequenceIndex < recordingSession.motionSequence.length) {
@@ -602,6 +676,10 @@ function completeRecordingSession() {
     console.log("All recordings completed!");
     console.log(`Total recordings: ${recordingSession.recordedData.length}`);
 
+    // Update progress display first
+    updateProgressDisplay();
+    updateRecordingStatus();
+
     // Auto-save the data
     autoSaveRecordedData();
 
@@ -609,9 +687,7 @@ function completeRecordingSession() {
     document.getElementById("start-recording-btn").disabled = true;
     document.getElementById("stop-recording-btn").disabled = true;
 
-    updateRecordingStatus();
-
-    alert(`Recording session completed! ${recordingSession.recordedData.length} motions recorded and saved.`);
+    alert(`Recording session completed!\n${recordingSession.recordedData.length} motions recorded and saved.`);
 }
 
 function autoSaveRecordedData() {
@@ -624,6 +700,7 @@ function autoSaveRecordedData() {
         sessionInfo: {
             totalMotions: recordingSession.totalMotions,
             trialsPerMotion: recordingSession.trialsPerMotion,
+            recordingDurationSeconds: recordingSession.recordingDuration / 1000,
             totalRecordings: recordingSession.recordedData.length,
             completedAt: new Date().toISOString(),
         },
@@ -735,6 +812,8 @@ function resetRecordingSession() {
     // Reset UI
     document.getElementById("setup-btn").disabled = false;
     document.getElementById("motion-count").disabled = false;
+    document.getElementById("trials-per-motion").disabled = false;
+    document.getElementById("recording-duration").disabled = false;
     document.getElementById("start-recording-btn").disabled = true;
     document.getElementById("stop-recording-btn").disabled = true;
     document.getElementById("reset-btn").disabled = true;
@@ -754,7 +833,14 @@ function updateProgressDisplay() {
     // Update summary
     const completed = recordingSession.currentSequenceIndex;
     const total = recordingSession.motionSequence.length;
-    progressSummary.textContent = `Progress: ${completed}/${total} recordings completed`;
+
+    if (completed >= total) {
+        // All recordings completed
+        progressSummary.textContent = `🎉 All recordings completed! (${total}/${total})`;
+    } else {
+        // Still in progress
+        progressSummary.textContent = `Progress: ${completed}/${total} recordings completed`;
+    }
 
     // Clear and rebuild progress grid
     progressGrid.innerHTML = "";
@@ -766,6 +852,11 @@ function updateProgressDisplay() {
 
         if (index < recordingSession.currentSequenceIndex) {
             progressItem.classList.add("completed");
+        } else if (index === recordingSession.currentSequenceIndex && !recordingSession.isRecording && !recordingSession.isCountingDown) {
+            // Don't highlight current if session is complete
+            if (recordingSession.currentSequenceIndex < recordingSession.motionSequence.length) {
+                progressItem.classList.add("current");
+            }
         } else if (index === recordingSession.currentSequenceIndex) {
             progressItem.classList.add("current");
         }
@@ -1044,7 +1135,7 @@ function drawMotionTab() {
         fill(255, 255, 255);
         textSize(14);
         textStyle(NORMAL);
-        text(`Trial ${recordingSession.currentTrial} of 3`, startX + 10, paddingY + 35);
+        text(`Trial ${recordingSession.currentTrial} of ${recordingSession.trialsPerMotion}`, startX + 10, paddingY + 35);
         text(`Data points: ${currentMotionData.length}`, startX + 10, paddingY + 55);
 
         // Show countdown timer
