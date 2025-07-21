@@ -7,6 +7,10 @@ import threading
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import logging
+import os
+import json
+from datetime import datetime
+from flask import request, jsonify
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -174,6 +178,57 @@ class ArduinoDataReader:
 
 # Global data reader instance
 data_reader = ArduinoDataReader()
+
+
+@app.route('/save_motion_data', methods=['POST'])
+def save_motion_data():
+    try:
+        # Create motion_results directory if it doesn't exist
+        results_dir = 'motion_results'
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+            print(f"Created directory: {results_dir}")
+
+        # Get the data from the request
+        motion_data = request.json
+
+        if not motion_data:
+            return jsonify({
+                'success': False,
+                'error': 'No data received'
+            }), 400
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        total_motions = motion_data.get('sessionInfo', {}).get('totalMotions', 'unknown')
+        filename = f'recorded_motions_{total_motions}motions_{timestamp}.json'
+        filepath = os.path.join(results_dir, filename)
+
+        # Save the data with pretty formatting
+        with open(filepath, 'w') as f:
+            json.dump(motion_data, f, indent=2, ensure_ascii=False)
+
+        # Log the save operation
+        total_recordings = motion_data.get('sessionInfo', {}).get('totalRecordings', 0)
+        print(f"✅ Saved motion data: {filepath}")
+        print(f"   - Total motions: {total_motions}")
+        print(f"   - Total recordings: {total_recordings}")
+        print(f"   - File size: {os.path.getsize(filepath)} bytes")
+
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'path': filepath,
+            'total_recordings': total_recordings
+        })
+
+    except Exception as e:
+        error_msg = f"Error saving motion data: {str(e)}"
+        print(f"❌ {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        }), 500
 
 # Routes for different pages
 @app.route('/')
