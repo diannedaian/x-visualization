@@ -155,21 +155,21 @@
             <option value="">Select a session...</option>
         </select>
     </div>
-    
+
     <div class="control-group">
         <label for="motion-select">Motion Type:</label>
         <select id="motion-select" disabled>
             <option value="">Select motion...</option>
         </select>
     </div>
-    
+
     <div class="control-group">
         <label for="trial-select">Trial Number:</label>
         <select id="trial-select" disabled>
             <option value="">Select trial...</option>
         </select>
     </div>
-    
+
     <div class="control-group">
         <label for="sensor-select">Sensor:</label>
         <select id="sensor-select" disabled>
@@ -184,7 +184,7 @@
             <option value="right_4">Right 4</option>
         </select>
     </div>
-    
+
     <button id="load-btn" class="analysis-btn" disabled>Load Data</button>
     <button id="compare-btn" class="analysis-btn" disabled>Average Motion</button>
     <button id="export-analysis-btn" class="analysis-btn" disabled>Export Analysis</button>
@@ -251,7 +251,7 @@ const colors = {
 
 const sensorLabels = {
     left_1: "Left 1",
-    left_2: "Left 2", 
+    left_2: "Left 2",
     left_3: "Left 3",
     left_4: "Left 4",
     right_1: "Right 1",
@@ -265,7 +265,7 @@ let graphWidth, graphHeight;
 
 function setup() {
     console.log("Analysis setup() function is running");
-    
+
     // Calculate canvas size
     let containerWidth = document.querySelector(".container").offsetWidth;
     let sidePadding = 60;
@@ -283,7 +283,7 @@ function setup() {
 
     canvas = createCanvas(canvasWidth, canvasHeight);
     canvas.parent("analysis-graph-container");
-    
+
     setupEventListeners();
     loadAvailableSessions();
 }
@@ -304,7 +304,7 @@ function setupEventListeners() {
         selectedMotion = this.value;
         updateTrialOptions();
         updateLoadButton();
-        
+
         // Enable/disable average motion button based on motion selection
         const averageBtn = document.getElementById("compare-btn");
         averageBtn.disabled = !selectedMotion;
@@ -356,7 +356,7 @@ function loadAvailableSessions() {
         .then(data => {
             console.log("Available sessions:", data);
             availableSessions = data.sessions || [];
-            
+
             if (availableSessions.length === 0) {
                 document.getElementById("no-data-message").style.display = "block";
                 document.getElementById("loading-message").style.display = "none";
@@ -366,7 +366,7 @@ function loadAvailableSessions() {
             // Populate session dropdown
             const sessionSelect = document.getElementById("session-select");
             sessionSelect.innerHTML = '<option value="">Select a session...</option>';
-            
+
             availableSessions.forEach(session => {
                 const option = document.createElement("option");
                 option.value = session.filename;
@@ -392,7 +392,7 @@ function loadSessionData(sessionId) {
         .then(data => {
             console.log("Session data loaded:", data);
             currentSession = data;
-            
+
             // Update session info
             document.getElementById("session-info").style.display = "block";
             document.getElementById("session-motions").textContent = data.sessionInfo.totalMotions;
@@ -403,12 +403,12 @@ function loadSessionData(sessionId) {
 
             // Update motion selector
             updateMotionSelector();
-            
+
             // Enable motion selection
             document.getElementById("motion-select").disabled = false;
             // Keep average motion button disabled until motion is selected
             document.getElementById("compare-btn").disabled = true;
-            
+
             document.getElementById("loading-message").style.display = "none";
         })
         .catch(error => {
@@ -422,7 +422,7 @@ function updateMotionSelector() {
 
     const motionSelector = document.getElementById("motion-selector");
     const motionGrid = document.getElementById("motion-grid");
-    
+
     motionSelector.style.display = "block";
     motionGrid.innerHTML = "";
 
@@ -439,19 +439,19 @@ function updateMotionSelector() {
     Object.keys(motionGroups).forEach(motionNumber => {
         const trials = motionGroups[motionNumber];
         const completedCount = trials.length;
-        
+
         const motionItem = document.createElement("div");
         motionItem.className = "motion-item completed";
         motionItem.textContent = `M${motionNumber} (${completedCount})`;
         motionItem.title = `Motion ${motionNumber}: ${completedCount} trials recorded`;
-        
+
         motionGrid.appendChild(motionItem);
     });
 
     // Update motion dropdown
     const motionSelect = document.getElementById("motion-select");
     motionSelect.innerHTML = '<option value="">Select motion...</option>';
-    
+
     Object.keys(motionGroups).forEach(motionNumber => {
         const option = document.createElement("option");
         option.value = motionNumber;
@@ -465,17 +465,17 @@ function updateTrialOptions() {
 
     const trialSelect = document.getElementById("trial-select");
     trialSelect.innerHTML = '<option value="">Select trial...</option>';
-    
+
     // Filter motions by selected motion number
     const motionTrials = currentSession.motions.filter(m => m.motionNumber == selectedMotion);
-    
+
     motionTrials.forEach(trial => {
         const option = document.createElement("option");
         option.value = trial.trial;
         option.textContent = `Trial ${trial.trial}`;
         trialSelect.appendChild(option);
     });
-    
+
     trialSelect.disabled = false;
 }
 
@@ -488,7 +488,7 @@ function loadMotionData() {
     if (!currentSession || !selectedMotion || !selectedTrial) return;
 
     // Find the specific motion data
-    const motionData = currentSession.motions.find(m => 
+    const motionData = currentSession.motions.find(m =>
         m.motionNumber == selectedMotion && m.trial == selectedTrial
     );
 
@@ -619,12 +619,12 @@ function drawCombinedAnalysisPlot(x, y, w, h, data) {
     if (currentSession && selectedMotion && selectedTrial === 'average') {
         // Get all trials for the selected motion
         const motionTrials = currentSession.motions.filter(m => m.motionNumber == selectedMotion);
-        
+
         motionTrials.forEach(trial => {
             if (trial.data && trial.data.length > 1) {
                 for (let sensorKey of sensorsToPlot) {
                     let color = colors[sensorKey];
-                    
+
                     // Plot individual trial data with transparency
                     stroke(color[0], color[1], color[2], 100); // Very transparent
                     strokeWeight(1);
@@ -702,12 +702,12 @@ function drawCombinedAnalysisPlot(x, y, w, h, data) {
     // Draw legend below x-axis in single row
     let legendY = y + h + 15; // Below the x-axis label
     let legendSpacing = 85; // Spacing between legend items
-    
+
     for (let i = 0; i < sensorsToPlot.length; i++) {
         let sensorKey = sensorsToPlot[i];
         let color = colors[sensorKey];
         let label = sensorLabels[sensorKey];
-        
+
         let legendX = x + 45 + i * legendSpacing;
 
         // Legend line
@@ -730,53 +730,53 @@ function averageMotion() {
         console.error("No session or motion selected");
         return;
     }
-    
+
     // Get all trials for the selected motion
     const motionTrials = currentSession.motions.filter(m => m.motionNumber == selectedMotion);
-    
+
     if (motionTrials.length < 2) {
         alert("Need at least 2 trials to calculate average");
         return;
     }
-    
+
     // Validate trial data
-    const validTrials = motionTrials.filter(trial => 
-        trial.data && 
-        Array.isArray(trial.data) && 
+    const validTrials = motionTrials.filter(trial =>
+        trial.data &&
+        Array.isArray(trial.data) &&
         trial.data.length > 0
     );
-    
+
     if (validTrials.length < 2) {
         alert("Need at least 2 valid trials to calculate average");
         return;
     }
-    
+
     // Find minimum length and check for significant length differences
     const trialLengths = validTrials.map(trial => trial.data.length);
     const minLength = Math.min(...trialLengths);
     const maxLength = Math.max(...trialLengths);
     const lengthDifference = maxLength - minLength;
-    
+
     if (lengthDifference > minLength * 0.1) { // More than 10% difference
         console.warn(`Trials have significantly different lengths: ${minLength} to ${maxLength}`);
     }
-    
+
     // Initialize averaged data
     const averagedData = [];
     const sensorKeys = ['left_1', 'left_2', 'left_3', 'left_4', 'right_1', 'right_2', 'right_3', 'right_4'];
-    
+
     // Loop through each time point
     for (let timeIndex = 0; timeIndex < minLength; timeIndex++) {
         const sensorValues = {};
         sensorKeys.forEach(sensor => {
             sensorValues[sensor] = [];
         });
-        
+
         // Collect all sensor values for this time point
         for (let trialIndex = 0; trialIndex < validTrials.length; trialIndex++) {
             const trial = validTrials[trialIndex];
             const dataPoint = trial.data[timeIndex];
-            
+
             if (dataPoint) {
                 sensorKeys.forEach(sensor => {
                     const value = dataPoint[sensor];
@@ -786,13 +786,13 @@ function averageMotion() {
                 });
             }
         }
-        
+
         // Calculate averages for this time point
         const averagedPoint = {
             timestamp: validTrials[0].data[timeIndex].timestamp,
             timeIndex: timeIndex
         };
-        
+
         // Calculate averages for each sensor at this time point
         sensorKeys.forEach(sensor => {
             const values = sensorValues[sensor];
@@ -803,10 +803,10 @@ function averageMotion() {
                 averagedPoint[sensor] = 0;
             }
         });
-        
+
         averagedData.push(averagedPoint);
     }
-    
+
     // Create averaged motion object
     const averagedMotion = {
         motionNumber: selectedMotion,
@@ -822,12 +822,12 @@ function averageMotion() {
             createdAt: new Date().toISOString()
         }
     };
-    
+
     // Update visualization
     currentMotionData = averagedMotion;
     selectedTrial = 'average';
     drawAnalysisGraph();
-    
+
     console.log(`Successfully averaged ${validTrials.length} trials for Motion ${selectedMotion}`);
     console.log(`Averaged data points: ${averagedData.length}`);
 }
@@ -919,16 +919,16 @@ function drawMultiMotionPlot(x, y, w, h) {
     // Draw averaged motion lines
     averagedMotions.forEach(motion => {
         const color = motion.color;
-        
+
         // Draw all 8 sensors for this motion in the same color
         const sensorKeys = ['left_1', 'left_2', 'left_3', 'left_4', 'right_1', 'right_2', 'right_3', 'right_4'];
-        
+
         sensorKeys.forEach(sensorKey => {
             stroke(color[0], color[1], color[2]);
             strokeWeight(2);
             noFill();
             beginShape();
-            
+
             for (let i = 0; i < motion.data.length; i++) {
                 const value = motion.data[i][sensorKey] || 0;
                 const clampedValue = Math.max(0, Math.min(5000, value));
@@ -945,7 +945,7 @@ function drawMultiMotionPlot(x, y, w, h) {
     averagedMotions.forEach((motion, index) => {
         const color = motion.color;
         const legendX = x + 45 + index * 120;
-        
+
         // Legend line
         stroke(color[0], color[1], color[2]);
         strokeWeight(3);
@@ -962,36 +962,36 @@ function drawMultiMotionPlot(x, y, w, h) {
 
 function calculateAveragedMotionData(trials) {
     // Validate trial data
-    const validTrials = trials.filter(trial => 
-        trial.data && 
-        Array.isArray(trial.data) && 
+    const validTrials = trials.filter(trial =>
+        trial.data &&
+        Array.isArray(trial.data) &&
         trial.data.length > 0
     );
-    
+
     if (validTrials.length < 2) {
         return [];
     }
-    
+
     // Find minimum length
     const trialLengths = validTrials.map(trial => trial.data.length);
     const minLength = Math.min(...trialLengths);
-    
+
     // Initialize averaged data
     const averagedData = [];
     const sensorKeys = ['left_1', 'left_2', 'left_3', 'left_4', 'right_1', 'right_2', 'right_3', 'right_4'];
-    
+
     // Loop through each time point
     for (let timeIndex = 0; timeIndex < minLength; timeIndex++) {
         const sensorValues = {};
         sensorKeys.forEach(sensor => {
             sensorValues[sensor] = [];
         });
-        
+
         // Collect all sensor values for this time point
         for (let trialIndex = 0; trialIndex < validTrials.length; trialIndex++) {
             const trial = validTrials[trialIndex];
             const dataPoint = trial.data[timeIndex];
-            
+
             if (dataPoint) {
                 sensorKeys.forEach(sensor => {
                     const value = dataPoint[sensor];
@@ -1001,13 +1001,13 @@ function calculateAveragedMotionData(trials) {
                 });
             }
         }
-        
+
         // Calculate averages for this time point
         const averagedPoint = {
             timestamp: validTrials[0].data[timeIndex].timestamp,
             timeIndex: timeIndex
         };
-        
+
         sensorKeys.forEach(sensor => {
             const values = sensorValues[sensor];
             if (values.length > 0) {
@@ -1017,10 +1017,10 @@ function calculateAveragedMotionData(trials) {
                 averagedPoint[sensor] = 0;
             }
         });
-        
+
         averagedData.push(averagedPoint);
     }
-    
+
     return averagedData;
 }
 
@@ -1059,8 +1059,10 @@ function drawPlaceholderPlot(x, y, w, h, message) {
     text(message, x + w / 2, y + h / 2);
 }
 
+// Replace the existing drawScatterPlot function in your code with this implementation
 function drawScatterPlot(x, y, w, h) {
-    // Draw background
+    pass
+    <!-- // Draw background
     fill(40, 40, 40);
     stroke(80);
     rect(x, y, w, h, 8);
@@ -1073,7 +1075,7 @@ function drawScatterPlot(x, y, w, h) {
     // X axis
     line(x + 40, y + h - 30, x + w - 10, y + h - 30);
 
-    // Y axis labels
+    // Y axis labels (0, 2500, 5000)
     fill(200);
     noStroke();
     textAlign(RIGHT, CENTER);
@@ -1082,27 +1084,172 @@ function drawScatterPlot(x, y, w, h) {
     text("2500", x + 35, y + (h - 20) / 2);
     text("0", x + 35, y + h - 30);
 
-    // X axis label
+    // X axis labels (1-8 for ports)
     textAlign(CENTER, TOP);
     textSize(10);
-    text("Time", x + w / 2, y + h - 18);
+    for (let i = 1; i <= 8; i++) {
+        let portX = map(i, 1, 8, x + 40, x + w - 10);
+        text(i.toString(), portX, y + h - 25);
+
+        // Draw vertical grid lines for each port
+        stroke(60);
+        strokeWeight(0.5);
+        line(portX, y + 10, portX, y + h - 30); -->
+    }
+
+    // Draw horizontal grid lines
+    stroke(60);
+    strokeWeight(0.5);
+    for (let i = 1; i <= 4; i++) {
+        let gridY = map(i * 1250, 0, 5000, y + h - 30, y + 10);
+        line(x + 40, gridY, x + w - 10, gridY);
+    }
+
+    // X axis label
+    noStroke();
+    fill(200);
+    textAlign(CENTER, TOP);
+    textSize(10);
+    text("Sensor Port (1-8)", x + w / 2, y + h - 15);
+
+    // Y axis label (rotated)
+    push();
+    translate(x + 20, y + h / 2);
+    rotate(-PI / 2);
+    textAlign(CENTER, CENTER);
+    text("Sensor Value", 0, 0);
+    pop();
 
     // Draw title
     noStroke();
     fill(255);
     textAlign(LEFT, TOP);
     textSize(14);
-    text("Scatter Plot Analysis", x + 45, y + 12);
+    text("Sensor Data Distribution", x + 45, y + 12);
 
-    // Draw placeholder text
+    // Check if we have session data to display
+    if (!currentSession || currentSession.motions.length === 0) {
+        fill(150);
+        textAlign(CENTER, CENTER);
+        textSize(16);
+        text("No motion data available", x + w / 2, y + h / 2);
+        textSize(12);
+        text("Record some motions to see scatter plot", x + w / 2, y + h / 2 + 25);
+        return;
+    }
+
+    // Define sensor mapping (port 1-8 to sensor keys)
+    const sensorMapping = {
+        1: 'left_1',
+        2: 'left_2',
+        3: 'left_3',
+        4: 'left_4',
+        5: 'right_1',
+        6: 'right_2',
+        7: 'right_3',
+        8: 'right_4'
+    };
+
+    // Colors for different motions
+    const motionColors = [
+        [255, 107, 107],   // Red
+        [69, 183, 209],    // Blue
+        [255, 159, 67],    // Orange
+        [75, 123, 236],    // Indigo
+        [78, 205, 196],    // Teal
+        [255, 221, 89],    // Yellow
+        [38, 222, 129],    // Green
+        [165, 94, 234],    // Purple
+        [255, 99, 132],    // Pink
+        [64, 196, 255]     // Light Blue
+    ];
+
+    // Group motions by motion number
+    const motionGroups = {};
+    currentSession.motions.forEach(motion => {
+        if (!motionGroups[motion.motionNumber]) {
+            motionGroups[motion.motionNumber] = [];
+        }
+        motionGroups[motion.motionNumber].push(motion);
+    });
+
+    // Process and draw scatter plot data
+    const uniqueMotions = Object.keys(motionGroups).sort((a, b) => parseInt(a) - parseInt(b));
+
+    uniqueMotions.forEach((motionNumber, motionIndex) => {
+        const trials = motionGroups[motionNumber];
+        const color = motionColors[motionIndex % motionColors.length];
+
+        // For each trial in this motion
+        trials.forEach(trial => {
+            if (!trial.data || trial.data.length === 0) return;
+
+            // Sample data points to avoid overcrowding (take every 10th point or max 50 points per trial)
+            const sampleRate = Math.max(1, Math.floor(trial.data.length / 50));
+
+            for (let dataIndex = 0; dataIndex < trial.data.length; dataIndex += sampleRate) {
+                const dataPoint = trial.data[dataIndex];
+
+                // Plot each sensor value for this data point
+                for (let port = 1; port <= 8; port++) {
+                    const sensorKey = sensorMapping[port];
+                    const sensorValue = dataPoint[sensorKey];
+
+                    if (typeof sensorValue === 'number' && !isNaN(sensorValue)) {
+                        // Clamp value to valid range
+                        const clampedValue = Math.max(0, Math.min(5000, sensorValue));
+
+                        // Add small random offset to port position to prevent overlapping
+                        const portOffset = (Math.random() - 0.5) * 0.3; // ±0.15 port units
+                        const plotX = map(port + portOffset, 1, 8, x + 40, x + w - 10);
+                        const plotY = map(clampedValue, 0, 5000, y + h - 30, y + 10);
+
+                        // Draw data point
+                        fill(color[0], color[1], color[2], 120); // Semi-transparent
+                        noStroke();
+                        ellipse(plotX, plotY, 3, 3);
+                    }
+                }
+            }
+        });
+    });
+
+    // Draw legend for motions
+    let legendStartY = y + h - 8;
+    let legendX = x + 50;
+    let legendSpacing = 80;
+
+    // Calculate how many motions can fit in one row
+    const maxLegendsPerRow = Math.floor((w - 100) / legendSpacing);
+
+    uniqueMotions.forEach((motionNumber, index) => {
+        const color = motionColors[index % motionColors.length];
+
+        // Calculate position (wrap to multiple rows if needed)
+        const row = Math.floor(index / maxLegendsPerRow);
+        const col = index % maxLegendsPerRow;
+        const currentLegendX = legendX + col * legendSpacing;
+        const currentLegendY = legendStartY + row * 15;
+
+        // Legend circle
+        fill(color[0], color[1], color[2]);
+        noStroke();
+        ellipse(currentLegendX, currentLegendY, 8, 8);
+
+        // Legend text
+        fill(200);
+        textAlign(LEFT, CENTER);
+        textSize(10);
+        text(`M${motionNumber}`, currentLegendX + 12, currentLegendY);
+    });
+
+    // Add info text about sampling
     fill(150);
-    textAlign(CENTER, CENTER);
-    textSize(16);
-    text("Scatter plot data will be displayed here", x + w / 2, y + h / 2);
-    textSize(12);
-    text("(Data visualization coming soon)", x + w / 2, y + h / 2 + 25);
+    textAlign(RIGHT, TOP);
+    textSize(9);
+    text("Sampled data points shown", x + w - 15, y + 25);
+    text("(to reduce visual clutter)", x + w - 15, y + 37);
 }
-
 function exportAnalysisData() {
     if (!currentMotionData) return;
 
@@ -1134,7 +1281,7 @@ function clearSessionData() {
     currentMotionData = null;
     selectedMotion = null;
     selectedTrial = null;
-    
+
     document.getElementById("session-info").style.display = "none";
     document.getElementById("motion-selector").style.display = "none";
     document.getElementById("motion-select").innerHTML = '<option value="">Select motion...</option>';
@@ -1145,7 +1292,7 @@ function clearSessionData() {
     document.getElementById("load-btn").disabled = true;
     document.getElementById("compare-btn").disabled = true;
     document.getElementById("export-analysis-btn").disabled = true;
-    
+
     // Clear canvas
     if (canvas) {
         background(26, 26, 26);
@@ -1167,7 +1314,7 @@ function windowResized() {
         let canvasHeight = 3 * plotHeight + 2 * paddingY + titleHeight + 40; // Three plots with padding + legend space
 
         resizeCanvas(canvasWidth, canvasHeight);
-        
+
         if (currentMotionData) {
             drawAnalysisGraph();
         }
@@ -1178,4 +1325,4 @@ function windowResized() {
 socket.on("server_status", function (data) {
     console.log("Server status:", data.message);
 });
-{% endblock %} 
+{% endblock %}
