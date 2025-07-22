@@ -279,7 +279,7 @@ function setup() {
     let titleHeight = 30;
 
     let canvasWidth = containerWidth;
-    let canvasHeight = 3 * plotHeight + 2 * paddingY + titleHeight; // Three plots with padding between
+    let canvasHeight = 3 * plotHeight + 2 * paddingY + titleHeight + 40; // Three plots with padding + legend space
 
     canvas = createCanvas(canvasWidth, canvasHeight);
     canvas.parent("analysis-graph-container");
@@ -508,7 +508,7 @@ function drawAnalysisGraph() {
     let sidePadding = 60;
     let availableWidth = containerWidth - 2 * sidePadding;
     let plotWidth = availableWidth;
-    let plotHeight = 350;
+    let plotHeight = 380; // Increased to accommodate legend below x-axis
     let paddingX = 20;
     let paddingY = 40;
     let titleHeight = 30;
@@ -543,8 +543,8 @@ function drawAnalysisGraph() {
         drawPlaceholderPlot(startX, startY, plotWidth, plotHeight, "Select a motion and trial to view individual analysis");
     }
 
-    // Calculate positions for remaining plots
-    let multiMotionY = startY + plotHeight + paddingY;
+    // Calculate positions for remaining plots - account for extended first plot
+    let multiMotionY = startY + plotHeight + 40 + paddingY; // +40 for legend space
     let scatterY = multiMotionY + plotHeight + paddingY;
 
     // Draw title for second plot
@@ -573,10 +573,10 @@ function drawAnalysisGraph() {
 }
 
 function drawCombinedAnalysisPlot(x, y, w, h, data) {
-    // Draw background
+    // Draw background - extend height to include legend
     fill(40, 40, 40);
     stroke(80);
-    rect(x, y, w, h, 8);
+    rect(x, y, w, h + 40, 8); // +40px to accommodate legend below
 
     // Draw axes
     stroke(200);
@@ -615,13 +615,47 @@ function drawCombinedAnalysisPlot(x, y, w, h, data) {
         sensorsToPlot = [selectedSensor];
     }
 
-    // Draw data lines for each sensor
+    // Draw individual trial lines first (more transparent)
+    if (currentSession && selectedMotion && selectedTrial === 'average') {
+        // Get all trials for the selected motion
+        const motionTrials = currentSession.motions.filter(m => m.motionNumber == selectedMotion);
+        
+        motionTrials.forEach(trial => {
+            if (trial.data && trial.data.length > 1) {
+                for (let sensorKey of sensorsToPlot) {
+                    let color = colors[sensorKey];
+                    
+                    // Plot individual trial data with transparency
+                    stroke(color[0], color[1], color[2], 100); // Very transparent
+                    strokeWeight(1);
+                    noFill();
+                    beginShape();
+                    for (let i = 0, n = trial.data.length; i < n; i++) {
+                        let value = trial.data[i][sensorKey] || 0;
+
+                        if (value < 0) {
+                            value = 0;
+                        } else if (value > 5000) {
+                            value = 5000;
+                        }
+
+                        let px = map(i, 0, trial.data.length - 1, x + 40, x + w - 10);
+                        let py = map(value, 0, 5000, y + h - 30, y + 10);
+                        vertex(px, py);
+                    }
+                    endShape();
+                }
+            }
+        });
+    }
+
+    // Draw averaged data lines on top (more visible)
     if (data && data.length > 1) {
         for (let sensorKey of sensorsToPlot) {
             let color = colors[sensorKey];
 
-            // Plot the data
-            stroke(color[0], color[1], color[2]);
+            // Plot the averaged data with full opacity
+            stroke(color[0], color[1], color[2], 255); // Fully opaque
             strokeWeight(2);
             noFill();
             beginShape();
@@ -665,17 +699,20 @@ function drawCombinedAnalysisPlot(x, y, w, h, data) {
         }
     }
 
-    // Draw legend
-    let legendY = y + h - 15;
+    // Draw legend below x-axis in single row
+    let legendY = y + h + 15; // Below the x-axis label
+    let legendSpacing = 85; // Spacing between legend items
+    
     for (let i = 0; i < sensorsToPlot.length; i++) {
         let sensorKey = sensorsToPlot[i];
         let color = colors[sensorKey];
         let label = sensorLabels[sensorKey];
+        
+        let legendX = x + 45 + i * legendSpacing;
 
         // Legend line
         stroke(color[0], color[1], color[2]);
         strokeWeight(2);
-        let legendX = x + 45 + i * 80;
         line(legendX, legendY, legendX + 20, legendY);
 
         // Legend text
@@ -1121,13 +1158,13 @@ function windowResized() {
         let sidePadding = 60;
         let availableWidth = containerWidth - 2 * sidePadding;
         let plotWidth = availableWidth;
-        let plotHeight = 350;
+        let plotHeight = 380; // Increased to accommodate legend below x-axis
         let paddingX = 20;
         let paddingY = 40;
         let titleHeight = 30;
 
         let canvasWidth = containerWidth;
-        let canvasHeight = 3 * plotHeight + 2 * paddingY + titleHeight; // Three plots with padding between
+        let canvasHeight = 3 * plotHeight + 2 * paddingY + titleHeight + 40; // Three plots with padding + legend space
 
         resizeCanvas(canvasWidth, canvasHeight);
         
