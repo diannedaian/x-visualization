@@ -279,7 +279,7 @@ function setup() {
     let titleHeight = 30;
 
     let canvasWidth = containerWidth;
-    let canvasHeight = 2 * plotHeight + paddingY + titleHeight; // Two plots with padding between
+    let canvasHeight = 3 * plotHeight + 2 * paddingY + titleHeight; // Three plots with padding between
 
     canvas = createCanvas(canvasWidth, canvasHeight);
     canvas.parent("analysis-graph-container");
@@ -501,11 +501,9 @@ function loadMotionData() {
 }
 
 function drawAnalysisGraph() {
-    if (!currentMotionData) return;
-
     background(26, 26, 26);
 
-    // Calculate layout for two plots
+    // Calculate layout for three plots
     let containerWidth = document.querySelector(".container").offsetWidth;
     let sidePadding = 60;
     let availableWidth = containerWidth - 2 * sidePadding;
@@ -516,7 +514,7 @@ function drawAnalysisGraph() {
     let titleHeight = 30;
 
     let startX = sidePadding;
-    let startY = titleHeight;
+    let startY = titleHeight + 30; // Increased to make room for main title
 
     // Draw main title
     fill(255);
@@ -524,17 +522,53 @@ function drawAnalysisGraph() {
     textAlign(CENTER, TOP);
     textSize(18);
     textStyle(BOLD);
-    const titleText = selectedTrial === 'average' ? 
-        `Averaged Motion ${selectedMotion} Analysis (${currentMotionData.metadata.originalTrials} trials)` :
-        `Motion ${selectedMotion} - Trial ${selectedTrial} Analysis`;
+    let titleText = "Motion Analysis";
     text(titleText, startX + plotWidth / 2, 10);
     textStyle(NORMAL);
 
-    // Draw combined analysis plot
-    drawCombinedAnalysisPlot(startX, startY, plotWidth, plotHeight, currentMotionData.data);
+    // Draw title for first plot
+    fill(255);
+    noStroke();
+    textAlign(LEFT, TOP);
+    textSize(16);
+    textStyle(BOLD);
+    text("Individual Motion Analysis", startX, startY - 25);
+    textStyle(NORMAL);
 
-    // Draw scatter plot below
-    let scatterY = startY + plotHeight + paddingY;
+    // Draw combined analysis plot (only if motion data exists)
+    if (currentMotionData) {
+        drawCombinedAnalysisPlot(startX, startY, plotWidth, plotHeight, currentMotionData.data);
+    } else {
+        // Draw placeholder for first plot
+        drawPlaceholderPlot(startX, startY, plotWidth, plotHeight, "Select a motion and trial to view individual analysis");
+    }
+
+    // Calculate positions for remaining plots
+    let multiMotionY = startY + plotHeight + paddingY;
+    let scatterY = multiMotionY + plotHeight + paddingY;
+
+    // Draw title for second plot
+    fill(255);
+    noStroke();
+    textAlign(LEFT, TOP);
+    textSize(16);
+    textStyle(BOLD);
+    text("Multi-Motion Comparison", startX, multiMotionY - 25);
+    textStyle(NORMAL);
+
+    // Draw multi-motion comparison plot
+    drawMultiMotionPlot(startX, multiMotionY, plotWidth, plotHeight);
+
+    // Draw title for third plot
+    fill(255);
+    noStroke();
+    textAlign(LEFT, TOP);
+    textSize(16);
+    textStyle(BOLD);
+    text("Scatter Plot Analysis", startX, scatterY - 25);
+    textStyle(NORMAL);
+
+    // Draw scatter plot
     drawScatterPlot(startX, scatterY, plotWidth, plotHeight);
 }
 
@@ -761,6 +795,233 @@ function averageMotion() {
     console.log(`Averaged data points: ${averagedData.length}`);
 }
 
+function drawMultiMotionPlot(x, y, w, h) {
+    // Draw background
+    fill(40, 40, 40);
+    stroke(80);
+    rect(x, y, w, h, 8);
+
+    // Draw axes
+    stroke(200);
+    strokeWeight(1);
+    // Y axis
+    line(x + 40, y + 10, x + 40, y + h - 30);
+    // X axis
+    line(x + 40, y + h - 30, x + w - 10, y + h - 30);
+
+    // Y axis labels
+    fill(200);
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(10);
+    text("5000", x + 35, y + 20);
+    text("2500", x + 35, y + (h - 20) / 2);
+    text("0", x + 35, y + h - 30);
+
+    // X axis label
+    textAlign(CENTER, TOP);
+    textSize(10);
+    text("Time", x + w / 2, y + h - 18);
+
+    // Draw title
+    noStroke();
+    fill(255);
+    textAlign(LEFT, TOP);
+    textSize(14);
+    text("Multi-Motion Comparison", x + 45, y + 12);
+
+    // Check if we have enough motions to compare
+    if (!currentSession || currentSession.sessionInfo.totalMotions < 2) {
+        // Draw message for insufficient motions
+        fill(150);
+        textAlign(CENTER, CENTER);
+        textSize(16);
+        text("Need at least 2 motions to compare", x + w / 2, y + h / 2);
+        textSize(12);
+        text("(Record more motions to see comparison)", x + w / 2, y + h / 2 + 25);
+        return;
+    }
+
+    // Generate averaged data for all motions
+    const motionColors = [
+        [255, 107, 107],   // Red
+        [69, 183, 209],    // Blue
+        [255, 159, 67],    // Orange
+        [75, 123, 236],    // Indigo
+        [78, 205, 196],    // Teal
+        [255, 221, 89],    // Yellow
+        [38, 222, 129],    // Green
+        [165, 94, 234],    // Purple
+        [255, 99, 132],    // Pink
+        [64, 196, 255]     // Light Blue
+    ];
+
+    // Group motions by motion number
+    const motionGroups = {};
+    currentSession.motions.forEach(motion => {
+        if (!motionGroups[motion.motionNumber]) {
+            motionGroups[motion.motionNumber] = [];
+        }
+        motionGroups[motion.motionNumber].push(motion);
+    });
+
+    // Calculate averaged data for each motion
+    const averagedMotions = [];
+    Object.keys(motionGroups).forEach((motionNumber, index) => {
+        const trials = motionGroups[motionNumber];
+        if (trials.length >= 2) {
+            const averagedData = calculateAveragedMotionData(trials);
+            averagedMotions.push({
+                motionNumber: parseInt(motionNumber),
+                data: averagedData,
+                color: motionColors[index % motionColors.length]
+            });
+        }
+    });
+
+    // Draw averaged motion lines
+    averagedMotions.forEach(motion => {
+        const color = motion.color;
+        
+        // Draw all 8 sensors for this motion in the same color
+        const sensorKeys = ['left_1', 'left_2', 'left_3', 'left_4', 'right_1', 'right_2', 'right_3', 'right_4'];
+        
+        sensorKeys.forEach(sensorKey => {
+            stroke(color[0], color[1], color[2]);
+            strokeWeight(2);
+            noFill();
+            beginShape();
+            
+            for (let i = 0; i < motion.data.length; i++) {
+                const value = motion.data[i][sensorKey] || 0;
+                const clampedValue = Math.max(0, Math.min(5000, value));
+                const px = map(i, 0, motion.data.length - 1, x + 40, x + w - 10);
+                const py = map(clampedValue, 0, 5000, y + h - 30, y + 10);
+                vertex(px, py);
+            }
+            endShape();
+        });
+    });
+
+    // Draw legend
+    let legendY = y + h - 15;
+    averagedMotions.forEach((motion, index) => {
+        const color = motion.color;
+        const legendX = x + 45 + index * 120;
+        
+        // Legend line
+        stroke(color[0], color[1], color[2]);
+        strokeWeight(3);
+        line(legendX, legendY, legendX + 30, legendY);
+
+        // Legend text
+        noStroke();
+        fill(200);
+        textAlign(LEFT, CENTER);
+        textSize(10);
+        text(`Motion ${motion.motionNumber}`, legendX + 35, legendY);
+    });
+}
+
+function calculateAveragedMotionData(trials) {
+    // Validate trial data
+    const validTrials = trials.filter(trial => 
+        trial.data && 
+        Array.isArray(trial.data) && 
+        trial.data.length > 0
+    );
+    
+    if (validTrials.length < 2) {
+        return [];
+    }
+    
+    // Find minimum length
+    const trialLengths = validTrials.map(trial => trial.data.length);
+    const minLength = Math.min(...trialLengths);
+    
+    // Initialize averaged data
+    const averagedData = [];
+    const sensorKeys = ['left_1', 'left_2', 'left_3', 'left_4', 'right_1', 'right_2', 'right_3', 'right_4'];
+    
+    // Loop through each time point
+    for (let timeIndex = 0; timeIndex < minLength; timeIndex++) {
+        const sensorValues = {};
+        sensorKeys.forEach(sensor => {
+            sensorValues[sensor] = [];
+        });
+        
+        // Collect all sensor values for this time point
+        for (let trialIndex = 0; trialIndex < validTrials.length; trialIndex++) {
+            const trial = validTrials[trialIndex];
+            const dataPoint = trial.data[timeIndex];
+            
+            if (dataPoint) {
+                sensorKeys.forEach(sensor => {
+                    const value = dataPoint[sensor];
+                    if (typeof value === 'number' && !isNaN(value)) {
+                        sensorValues[sensor].push(value);
+                    }
+                });
+            }
+        }
+        
+        // Calculate averages for this time point
+        const averagedPoint = {
+            timestamp: validTrials[0].data[timeIndex].timestamp,
+            timeIndex: timeIndex
+        };
+        
+        sensorKeys.forEach(sensor => {
+            const values = sensorValues[sensor];
+            if (values.length > 0) {
+                const sum = values.reduce((acc, val) => acc + val, 0);
+                averagedPoint[sensor] = sum / values.length;
+            } else {
+                averagedPoint[sensor] = 0;
+            }
+        });
+        
+        averagedData.push(averagedPoint);
+    }
+    
+    return averagedData;
+}
+
+function drawPlaceholderPlot(x, y, w, h, message) {
+    // Draw background
+    fill(40, 40, 40);
+    stroke(80);
+    rect(x, y, w, h, 8);
+
+    // Draw axes
+    stroke(200);
+    strokeWeight(1);
+    // Y axis
+    line(x + 40, y + 10, x + 40, y + h - 30);
+    // X axis
+    line(x + 40, y + h - 30, x + w - 10, y + h - 30);
+
+    // Y axis labels
+    fill(200);
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(10);
+    text("5000", x + 35, y + 20);
+    text("2500", x + 35, y + (h - 20) / 2);
+    text("0", x + 35, y + h - 30);
+
+    // X axis label
+    textAlign(CENTER, TOP);
+    textSize(10);
+    text("Time", x + w / 2, y + h - 18);
+
+    // Draw placeholder message
+    fill(150);
+    textAlign(CENTER, CENTER);
+    textSize(16);
+    text(message, x + w / 2, y + h / 2);
+}
+
 function drawScatterPlot(x, y, w, h) {
     // Draw background
     fill(40, 40, 40);
@@ -866,7 +1127,7 @@ function windowResized() {
         let titleHeight = 30;
 
         let canvasWidth = containerWidth;
-        let canvasHeight = 2 * plotHeight + paddingY + titleHeight; // Two plots with padding between
+        let canvasHeight = 3 * plotHeight + 2 * paddingY + titleHeight; // Three plots with padding between
 
         resizeCanvas(canvasWidth, canvasHeight);
         
