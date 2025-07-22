@@ -1,0 +1,883 @@
+{% extends "base.html" %}
+
+{% block nav_analysis %}active{% endblock %}
+
+{% block extra_styles %}
+/* Motion Analysis Tab Styles */
+.analysis-controls {
+    background-color: #333;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.control-group label {
+    font-size: 12px;
+    color: #ccc;
+    font-weight: bold;
+}
+
+.control-group select,
+.control-group input {
+    padding: 8px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background-color: #444;
+    color: white;
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.analysis-btn {
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.analysis-btn:hover {
+    background-color: #1976d2;
+}
+
+.analysis-btn:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+
+.session-info {
+    background-color: #333;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.session-info h3 {
+    margin: 0 0 10px 0;
+    color: #4caf50;
+}
+
+.session-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    font-size: 14px;
+}
+
+.session-detail {
+    background-color: #444;
+    padding: 8px;
+    border-radius: 3px;
+}
+
+.session-detail strong {
+    color: #4caf50;
+}
+
+.motion-selector {
+    background-color: #333;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.motion-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.motion-item {
+    background-color: #555;
+    padding: 8px;
+    border-radius: 3px;
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.motion-item:hover {
+    background-color: #666;
+}
+
+.motion-item.selected {
+    background-color: #4caf50;
+    color: white;
+}
+
+.motion-item.completed {
+    background-color: #2196f3;
+    color: white;
+}
+
+#analysis-graph-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.no-data-message {
+    text-align: center;
+    padding: 40px;
+    color: #ccc;
+    font-size: 18px;
+}
+
+.loading-message {
+    text-align: center;
+    padding: 20px;
+    color: #4caf50;
+    font-size: 16px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="analysis-controls">
+    <div class="control-group">
+        <label for="session-select">Recording Session:</label>
+        <select id="session-select">
+            <option value="">Select a session...</option>
+        </select>
+    </div>
+    
+    <div class="control-group">
+        <label for="motion-select">Motion Type:</label>
+        <select id="motion-select" disabled>
+            <option value="">Select motion...</option>
+        </select>
+    </div>
+    
+    <div class="control-group">
+        <label for="trial-select">Trial Number:</label>
+        <select id="trial-select" disabled>
+            <option value="">Select trial...</option>
+        </select>
+    </div>
+    
+    <div class="control-group">
+        <label for="sensor-select">Sensor:</label>
+        <select id="sensor-select" disabled>
+            <option value="all">All Sensors</option>
+            <option value="left_1">Left 1</option>
+            <option value="left_2">Left 2</option>
+            <option value="left_3">Left 3</option>
+            <option value="left_4">Left 4</option>
+            <option value="right_1">Right 1</option>
+            <option value="right_2">Right 2</option>
+            <option value="right_3">Right 3</option>
+            <option value="right_4">Right 4</option>
+        </select>
+    </div>
+    
+    <button id="load-btn" class="analysis-btn" disabled>Load Data</button>
+    <button id="compare-btn" class="analysis-btn" disabled>Average Motion</button>
+    <button id="export-analysis-btn" class="analysis-btn" disabled>Export Analysis</button>
+</div>
+
+<div id="session-info" class="session-info" style="display: none;">
+    <h3>Session Information</h3>
+    <div class="session-details">
+        <div class="session-detail">
+            <strong>Total Motions:</strong> <span id="session-motions">-</span>
+        </div>
+        <div class="session-detail">
+            <strong>Trials per Motion:</strong> <span id="session-trials">-</span>
+        </div>
+        <div class="session-detail">
+            <strong>Recording Duration:</strong> <span id="session-duration">-</span>
+        </div>
+        <div class="session-detail">
+            <strong>Total Recordings:</strong> <span id="session-total">-</span>
+        </div>
+        <div class="session-detail">
+            <strong>Completed:</strong> <span id="session-completed">-</span>
+        </div>
+    </div>
+</div>
+
+<div id="motion-selector" class="motion-selector" style="display: none;">
+    <h3>Motion Overview</h3>
+    <div id="motion-grid" class="motion-grid"></div>
+</div>
+
+<div id="analysis-graph-container"></div>
+
+<div id="no-data-message" class="no-data-message" style="display: none;">
+    <p>No recorded motion data found.</p>
+    <p>Record some motions first using the Motion Recognition tab.</p>
+</div>
+
+<div id="loading-message" class="loading-message" style="display: none;">
+    <p>Loading motion data...</p>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+// Global variables for analysis
+let availableSessions = [];
+let currentSession = null;
+let currentMotionData = null;
+let selectedMotion = null;
+let selectedTrial = null;
+let selectedSensor = 'all';
+
+// Colors for sensors (same as visualization)
+const colors = {
+    left_1: [255, 107, 107], // Red
+    left_2: [255, 159, 67],  // Orange
+    left_3: [255, 221, 89],  // Yellow
+    left_4: [38, 222, 129],  // Green
+    right_1: [78, 205, 196], // Teal
+    right_2: [69, 183, 209], // Blue
+    right_3: [75, 123, 236], // Indigo
+    right_4: [165, 94, 234], // Purple
+};
+
+const sensorLabels = {
+    left_1: "Left 1",
+    left_2: "Left 2", 
+    left_3: "Left 3",
+    left_4: "Left 4",
+    right_1: "Right 1",
+    right_2: "Right 2",
+    right_3: "Right 3",
+    right_4: "Right 4"
+};
+
+let canvas = null;
+let graphWidth, graphHeight;
+
+function setup() {
+    console.log("Analysis setup() function is running");
+    
+    // Calculate canvas size
+    let containerWidth = document.querySelector(".container").offsetWidth;
+    let sidePadding = 60;
+    let availableWidth = containerWidth - 2 * sidePadding;
+    let plotWidth = Math.floor(availableWidth / 4);
+    let plotHeight = 300;
+    let paddingX = 20;
+    let paddingY = 40;
+    let cols = 4;
+    let rows = 2;
+    let titleHeight = 30;
+
+    let canvasWidth = containerWidth;
+    let canvasHeight = 2 * plotHeight + paddingY + titleHeight; // Two plots with padding between
+
+    canvas = createCanvas(canvasWidth, canvasHeight);
+    canvas.parent("analysis-graph-container");
+    
+    setupEventListeners();
+    loadAvailableSessions();
+}
+
+function setupEventListeners() {
+    // Session selection
+    document.getElementById("session-select").addEventListener("change", function() {
+        const sessionId = this.value;
+        if (sessionId) {
+            loadSessionData(sessionId);
+        } else {
+            clearSessionData();
+        }
+    });
+
+    // Motion selection
+    document.getElementById("motion-select").addEventListener("change", function() {
+        selectedMotion = this.value;
+        updateTrialOptions();
+        updateLoadButton();
+        
+        // Enable/disable average motion button based on motion selection
+        const averageBtn = document.getElementById("compare-btn");
+        averageBtn.disabled = !selectedMotion;
+    });
+
+    // Trial selection
+    document.getElementById("trial-select").addEventListener("change", function() {
+        selectedTrial = this.value;
+        updateLoadButton();
+    });
+
+    // Sensor selection
+    document.getElementById("sensor-select").addEventListener("change", function() {
+        selectedSensor = this.value;
+        if (currentMotionData) {
+            drawAnalysisGraph();
+        }
+    });
+
+    // Load button
+    document.getElementById("load-btn").addEventListener("click", function() {
+        if (selectedMotion && selectedTrial) {
+            loadMotionData();
+        }
+    });
+
+    // Average Motion button
+    document.getElementById("compare-btn").addEventListener("click", function() {
+        if (selectedMotion) {
+            averageMotion();
+        }
+    });
+
+    // Export button
+    document.getElementById("export-analysis-btn").addEventListener("click", function() {
+        if (currentMotionData) {
+            exportAnalysisData();
+        }
+    });
+}
+
+function loadAvailableSessions() {
+    console.log("Loading available sessions...");
+    document.getElementById("loading-message").style.display = "block";
+    document.getElementById("no-data-message").style.display = "none";
+
+    fetch('/get_motion_sessions')
+        .then(response => response.json())
+        .then(data => {
+            console.log("Available sessions:", data);
+            availableSessions = data.sessions || [];
+            
+            if (availableSessions.length === 0) {
+                document.getElementById("no-data-message").style.display = "block";
+                document.getElementById("loading-message").style.display = "none";
+                return;
+            }
+
+            // Populate session dropdown
+            const sessionSelect = document.getElementById("session-select");
+            sessionSelect.innerHTML = '<option value="">Select a session...</option>';
+            
+            availableSessions.forEach(session => {
+                const option = document.createElement("option");
+                option.value = session.filename;
+                option.textContent = `${session.filename} (${session.motionCount} motions, ${session.trialCount} trials)`;
+                sessionSelect.appendChild(option);
+            });
+
+            document.getElementById("loading-message").style.display = "none";
+        })
+        .catch(error => {
+            console.error("Error loading sessions:", error);
+            document.getElementById("loading-message").style.display = "none";
+            document.getElementById("no-data-message").style.display = "block";
+        });
+}
+
+function loadSessionData(sessionId) {
+    console.log("Loading session data for:", sessionId);
+    document.getElementById("loading-message").style.display = "block";
+
+    fetch(`/get_motion_session/${encodeURIComponent(sessionId)}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log("Session data loaded:", data);
+            currentSession = data;
+            
+            // Update session info
+            document.getElementById("session-info").style.display = "block";
+            document.getElementById("session-motions").textContent = data.sessionInfo.totalMotions;
+            document.getElementById("session-trials").textContent = data.sessionInfo.trialsPerMotion;
+            document.getElementById("session-duration").textContent = `${data.sessionInfo.recordingDurationSeconds}s`;
+            document.getElementById("session-total").textContent = data.sessionInfo.totalRecordings;
+            document.getElementById("session-completed").textContent = data.motions.length;
+
+            // Update motion selector
+            updateMotionSelector();
+            
+            // Enable motion selection
+            document.getElementById("motion-select").disabled = false;
+            // Keep average motion button disabled until motion is selected
+            document.getElementById("compare-btn").disabled = true;
+            
+            document.getElementById("loading-message").style.display = "none";
+        })
+        .catch(error => {
+            console.error("Error loading session data:", error);
+            document.getElementById("loading-message").style.display = "none";
+        });
+}
+
+function updateMotionSelector() {
+    if (!currentSession) return;
+
+    const motionSelector = document.getElementById("motion-selector");
+    const motionGrid = document.getElementById("motion-grid");
+    
+    motionSelector.style.display = "block";
+    motionGrid.innerHTML = "";
+
+    // Group motions by motion number
+    const motionGroups = {};
+    currentSession.motions.forEach(motion => {
+        if (!motionGroups[motion.motionNumber]) {
+            motionGroups[motion.motionNumber] = [];
+        }
+        motionGroups[motion.motionNumber].push(motion);
+    });
+
+    // Create motion items
+    Object.keys(motionGroups).forEach(motionNumber => {
+        const trials = motionGroups[motionNumber];
+        const completedCount = trials.length;
+        
+        const motionItem = document.createElement("div");
+        motionItem.className = "motion-item completed";
+        motionItem.textContent = `M${motionNumber} (${completedCount})`;
+        motionItem.title = `Motion ${motionNumber}: ${completedCount} trials recorded`;
+        
+        motionGrid.appendChild(motionItem);
+    });
+
+    // Update motion dropdown
+    const motionSelect = document.getElementById("motion-select");
+    motionSelect.innerHTML = '<option value="">Select motion...</option>';
+    
+    Object.keys(motionGroups).forEach(motionNumber => {
+        const option = document.createElement("option");
+        option.value = motionNumber;
+        option.textContent = `Motion ${motionNumber}`;
+        motionSelect.appendChild(option);
+    });
+}
+
+function updateTrialOptions() {
+    if (!currentSession || !selectedMotion) return;
+
+    const trialSelect = document.getElementById("trial-select");
+    trialSelect.innerHTML = '<option value="">Select trial...</option>';
+    
+    // Filter motions by selected motion number
+    const motionTrials = currentSession.motions.filter(m => m.motionNumber == selectedMotion);
+    
+    motionTrials.forEach(trial => {
+        const option = document.createElement("option");
+        option.value = trial.trial;
+        option.textContent = `Trial ${trial.trial}`;
+        trialSelect.appendChild(option);
+    });
+    
+    trialSelect.disabled = false;
+}
+
+function updateLoadButton() {
+    const loadBtn = document.getElementById("load-btn");
+    loadBtn.disabled = !(selectedMotion && selectedTrial);
+}
+
+function loadMotionData() {
+    if (!currentSession || !selectedMotion || !selectedTrial) return;
+
+    // Find the specific motion data
+    const motionData = currentSession.motions.find(m => 
+        m.motionNumber == selectedMotion && m.trial == selectedTrial
+    );
+
+    if (motionData) {
+        currentMotionData = motionData;
+        document.getElementById("sensor-select").disabled = false;
+        document.getElementById("export-analysis-btn").disabled = false;
+        drawAnalysisGraph();
+    }
+}
+
+function drawAnalysisGraph() {
+    if (!currentMotionData) return;
+
+    background(26, 26, 26);
+
+    // Calculate layout for two plots
+    let containerWidth = document.querySelector(".container").offsetWidth;
+    let sidePadding = 60;
+    let availableWidth = containerWidth - 2 * sidePadding;
+    let plotWidth = availableWidth;
+    let plotHeight = 350;
+    let paddingX = 20;
+    let paddingY = 40;
+    let titleHeight = 30;
+
+    let startX = sidePadding;
+    let startY = titleHeight;
+
+    // Draw main title
+    fill(255);
+    noStroke();
+    textAlign(CENTER, TOP);
+    textSize(18);
+    textStyle(BOLD);
+    const titleText = selectedTrial === 'average' ? 
+        `Averaged Motion ${selectedMotion} Analysis (${currentMotionData.metadata.originalTrials} trials)` :
+        `Motion ${selectedMotion} - Trial ${selectedTrial} Analysis`;
+    text(titleText, startX + plotWidth / 2, 10);
+    textStyle(NORMAL);
+
+    // Draw combined analysis plot
+    drawCombinedAnalysisPlot(startX, startY, plotWidth, plotHeight, currentMotionData.data);
+
+    // Draw scatter plot below
+    let scatterY = startY + plotHeight + paddingY;
+    drawScatterPlot(startX, scatterY, plotWidth, plotHeight);
+}
+
+function drawCombinedAnalysisPlot(x, y, w, h, data) {
+    // Draw background
+    fill(40, 40, 40);
+    stroke(80);
+    rect(x, y, w, h, 8);
+
+    // Draw axes
+    stroke(200);
+    strokeWeight(1);
+    // Y axis
+    line(x + 40, y + 10, x + 40, y + h - 30);
+    // X axis
+    line(x + 40, y + h - 30, x + w - 10, y + h - 30);
+
+    // Y axis labels (0, 2500, 5000)
+    fill(200);
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(10);
+    text("5000", x + 35, y + 20);
+    text("2500", x + 35, y + (h - 20) / 2);
+    text("0", x + 35, y + h - 30);
+
+    // X axis label
+    textAlign(CENTER, TOP);
+    textSize(10);
+    text("Time", x + w / 2, y + h - 18);
+
+    // Draw label
+    noStroke();
+    fill(255);
+    textAlign(LEFT, TOP);
+    textSize(14);
+    text("All Sensors", x + 45, y + 12);
+
+    // Determine which sensors to plot based on selectedSensor
+    let sensorsToPlot = [];
+    if (selectedSensor === 'all') {
+        sensorsToPlot = ["left_1", "left_2", "left_3", "left_4", "right_1", "right_2", "right_3", "right_4"];
+    } else {
+        sensorsToPlot = [selectedSensor];
+    }
+
+    // Draw data lines for each sensor
+    if (data && data.length > 1) {
+        for (let sensorKey of sensorsToPlot) {
+            let color = colors[sensorKey];
+
+            // Plot the data
+            stroke(color[0], color[1], color[2]);
+            strokeWeight(2);
+            noFill();
+            beginShape();
+            for (let i = 0, n = data.length; i < n; i++) {
+                let value = data[i][sensorKey] || 0;
+
+                if (value < 0) {
+                    value = 0;
+                } else if (value > 5000) {
+                    value = 5000;
+                }
+
+                let px = map(i, 0, data.length - 1, x + 40, x + w - 10);
+                let py = map(value, 0, 5000, y + h - 30, y + 10);
+                vertex(px, py);
+            }
+            endShape();
+        }
+    }
+
+    // Draw current value dots for each sensor
+    let n = data.length;
+    if (n > 0) {
+        for (let i = 0; i < sensorsToPlot.length; i++) {
+            let sensorKey = sensorsToPlot[i];
+            let color = colors[sensorKey];
+            let latest = Math.max(0, Math.min(5000, data[n - 1][sensorKey] || 0));
+            let px = x + w - 15 - i * 20; // Offset dots horizontally
+            let py = map(latest, 0, 5000, y + h - 30, y + 10);
+
+            fill(color[0], color[1], color[2]);
+            stroke(255);
+            ellipse(px, py, 8, 8);
+
+            // Show latest value
+            noStroke();
+            fill(230);
+            textAlign(LEFT, TOP);
+            textSize(10);
+            text(latest.toFixed(1), px + 10, py - 5);
+        }
+    }
+
+    // Draw legend
+    let legendY = y + h - 15;
+    for (let i = 0; i < sensorsToPlot.length; i++) {
+        let sensorKey = sensorsToPlot[i];
+        let color = colors[sensorKey];
+        let label = sensorLabels[sensorKey];
+
+        // Legend line
+        stroke(color[0], color[1], color[2]);
+        strokeWeight(2);
+        let legendX = x + 45 + i * 80;
+        line(legendX, legendY, legendX + 20, legendY);
+
+        // Legend text
+        noStroke();
+        fill(200);
+        textAlign(LEFT, CENTER);
+        textSize(10);
+        text(label, legendX + 25, legendY);
+    }
+}
+
+function averageMotion() {
+    // Input validation
+    if (!currentSession || !selectedMotion) {
+        console.error("No session or motion selected");
+        return;
+    }
+    
+    // Get all trials for the selected motion
+    const motionTrials = currentSession.motions.filter(m => m.motionNumber == selectedMotion);
+    
+    if (motionTrials.length < 2) {
+        alert("Need at least 2 trials to calculate average");
+        return;
+    }
+    
+    // Validate trial data
+    const validTrials = motionTrials.filter(trial => 
+        trial.data && 
+        Array.isArray(trial.data) && 
+        trial.data.length > 0
+    );
+    
+    if (validTrials.length < 2) {
+        alert("Need at least 2 valid trials to calculate average");
+        return;
+    }
+    
+    // Find minimum length and check for significant length differences
+    const trialLengths = validTrials.map(trial => trial.data.length);
+    const minLength = Math.min(...trialLengths);
+    const maxLength = Math.max(...trialLengths);
+    const lengthDifference = maxLength - minLength;
+    
+    if (lengthDifference > minLength * 0.1) { // More than 10% difference
+        console.warn(`Trials have significantly different lengths: ${minLength} to ${maxLength}`);
+    }
+    
+    // Initialize averaged data
+    const averagedData = [];
+    const sensorKeys = ['left_1', 'left_2', 'left_3', 'left_4', 'right_1', 'right_2', 'right_3', 'right_4'];
+    
+    // Loop through each time point
+    for (let timeIndex = 0; timeIndex < minLength; timeIndex++) {
+        const sensorValues = {};
+        sensorKeys.forEach(sensor => {
+            sensorValues[sensor] = [];
+        });
+        
+        // Collect all sensor values for this time point
+        for (let trialIndex = 0; trialIndex < validTrials.length; trialIndex++) {
+            const trial = validTrials[trialIndex];
+            const dataPoint = trial.data[timeIndex];
+            
+            if (dataPoint) {
+                sensorKeys.forEach(sensor => {
+                    const value = dataPoint[sensor];
+                    if (typeof value === 'number' && !isNaN(value)) {
+                        sensorValues[sensor].push(value);
+                    }
+                });
+            }
+        }
+        
+        // Calculate averages for this time point
+        const averagedPoint = {
+            timestamp: validTrials[0].data[timeIndex].timestamp,
+            timeIndex: timeIndex
+        };
+        
+        // Calculate averages for each sensor at this time point
+        sensorKeys.forEach(sensor => {
+            const values = sensorValues[sensor];
+            if (values.length > 0) {
+                const sum = values.reduce((acc, val) => acc + val, 0);
+                averagedPoint[sensor] = sum / values.length;  // Mean calculation
+            } else {
+                averagedPoint[sensor] = 0;
+            }
+        });
+        
+        averagedData.push(averagedPoint);
+    }
+    
+    // Create averaged motion object
+    const averagedMotion = {
+        motionNumber: selectedMotion,
+        trial: 'average',
+        data: averagedData,
+        metadata: {
+            originalTrials: validTrials.length,
+            averagedTrials: validTrials.map(t => t.trial),
+            dataPoints: averagedData.length,
+            minLength: minLength,
+            maxLength: maxLength,
+            lengthDifference: lengthDifference,
+            createdAt: new Date().toISOString()
+        }
+    };
+    
+    // Update visualization
+    currentMotionData = averagedMotion;
+    selectedTrial = 'average';
+    drawAnalysisGraph();
+    
+    console.log(`Successfully averaged ${validTrials.length} trials for Motion ${selectedMotion}`);
+    console.log(`Averaged data points: ${averagedData.length}`);
+}
+
+function drawScatterPlot(x, y, w, h) {
+    // Draw background
+    fill(40, 40, 40);
+    stroke(80);
+    rect(x, y, w, h, 8);
+
+    // Draw axes
+    stroke(200);
+    strokeWeight(1);
+    // Y axis
+    line(x + 40, y + 10, x + 40, y + h - 30);
+    // X axis
+    line(x + 40, y + h - 30, x + w - 10, y + h - 30);
+
+    // Y axis labels
+    fill(200);
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(10);
+    text("5000", x + 35, y + 20);
+    text("2500", x + 35, y + (h - 20) / 2);
+    text("0", x + 35, y + h - 30);
+
+    // X axis label
+    textAlign(CENTER, TOP);
+    textSize(10);
+    text("Time", x + w / 2, y + h - 18);
+
+    // Draw title
+    noStroke();
+    fill(255);
+    textAlign(LEFT, TOP);
+    textSize(14);
+    text("Scatter Plot Analysis", x + 45, y + 12);
+
+    // Draw placeholder text
+    fill(150);
+    textAlign(CENTER, CENTER);
+    textSize(16);
+    text("Scatter plot data will be displayed here", x + w / 2, y + h / 2);
+    textSize(12);
+    text("(Data visualization coming soon)", x + w / 2, y + h / 2 + 25);
+}
+
+function exportAnalysisData() {
+    if (!currentMotionData) return;
+
+    const exportData = {
+        sessionInfo: currentSession.sessionInfo,
+        motionData: currentMotionData,
+        analysisInfo: {
+            selectedMotion: selectedMotion,
+            selectedTrial: selectedTrial,
+            selectedSensor: selectedSensor,
+            exportedAt: new Date().toISOString()
+        }
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: "application/json",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `motion_analysis_M${selectedMotion}_T${selectedTrial}.json`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+function clearSessionData() {
+    currentSession = null;
+    currentMotionData = null;
+    selectedMotion = null;
+    selectedTrial = null;
+    
+    document.getElementById("session-info").style.display = "none";
+    document.getElementById("motion-selector").style.display = "none";
+    document.getElementById("motion-select").innerHTML = '<option value="">Select motion...</option>';
+    document.getElementById("motion-select").disabled = true;
+    document.getElementById("trial-select").innerHTML = '<option value="">Select trial...</option>';
+    document.getElementById("trial-select").disabled = true;
+    document.getElementById("sensor-select").disabled = true;
+    document.getElementById("load-btn").disabled = true;
+    document.getElementById("compare-btn").disabled = true;
+    document.getElementById("export-analysis-btn").disabled = true;
+    
+    // Clear canvas
+    if (canvas) {
+        background(26, 26, 26);
+    }
+}
+
+function windowResized() {
+    if (canvas) {
+        let containerWidth = document.querySelector(".container").offsetWidth;
+        let sidePadding = 60;
+        let availableWidth = containerWidth - 2 * sidePadding;
+        let plotWidth = availableWidth;
+        let plotHeight = 350;
+        let paddingX = 20;
+        let paddingY = 40;
+        let titleHeight = 30;
+
+        let canvasWidth = containerWidth;
+        let canvasHeight = 2 * plotHeight + paddingY + titleHeight; // Two plots with padding between
+
+        resizeCanvas(canvasWidth, canvasHeight);
+        
+        if (currentMotionData) {
+            drawAnalysisGraph();
+        }
+    }
+}
+
+// Handle server status
+socket.on("server_status", function (data) {
+    console.log("Server status:", data.message);
+});
+{% endblock %} 

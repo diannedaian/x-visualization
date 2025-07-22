@@ -246,6 +246,66 @@ def settings():
     """Settings page"""
     return render_template('settings.html')
 
+@app.route('/analysis')
+def analysis():
+    """Motion analysis page"""
+    return render_template('analysis.html')
+
+# API endpoints for motion analysis
+@app.route('/get_motion_sessions')
+def get_motion_sessions():
+    """Get list of available motion recording sessions"""
+    try:
+        motion_results_dir = 'motion_results'
+        if not os.path.exists(motion_results_dir):
+            return jsonify({'sessions': []})
+        
+        sessions = []
+        for filename in os.listdir(motion_results_dir):
+            if filename.endswith('.json'):
+                filepath = os.path.join(motion_results_dir, filename)
+                try:
+                    with open(filepath, 'r') as f:
+                        data = json.load(f)
+                        session_info = data.get('sessionInfo', {})
+                        sessions.append({
+                            'filename': filename,
+                            'motionCount': session_info.get('totalMotions', 0),
+                            'trialCount': session_info.get('trialsPerMotion', 0),
+                            'totalRecordings': session_info.get('totalRecordings', 0),
+                            'completedAt': session_info.get('completedAt', ''),
+                            'filepath': filepath
+                        })
+                except Exception as e:
+                    logger.error(f"Error reading session file {filename}: {e}")
+                    continue
+        
+        # Sort by completion date (newest first)
+        sessions.sort(key=lambda x: x.get('completedAt', ''), reverse=True)
+        
+        return jsonify({'sessions': sessions})
+    
+    except Exception as e:
+        logger.error(f"Error getting motion sessions: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_motion_session/<filename>')
+def get_motion_session(filename):
+    """Get specific motion session data"""
+    try:
+        filepath = os.path.join('motion_results', filename)
+        if not os.path.exists(filepath):
+            return jsonify({'error': 'Session file not found'}), 404
+        
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        
+        return jsonify(data)
+    
+    except Exception as e:
+        logger.error(f"Error loading motion session {filename}: {e}")
+        return jsonify({'error': str(e)}), 500
+
 # WebSocket event handlers
 @socketio.on('connect')
 def handle_connect():
